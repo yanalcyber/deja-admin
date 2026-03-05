@@ -1,4 +1,4 @@
-{\rtf1}import streamlit as st
+import streamlit as st
 from auth import show_login_screen
 from dashboard import show_dashboard_screen
 
