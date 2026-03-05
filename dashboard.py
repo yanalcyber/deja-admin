@@ -1,4 +1,4 @@
-{\rtf1}import streamlit as st
+import streamlit as st
 import pandas as pd
 from database import db, supabase
 
