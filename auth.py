@@ -7,7 +7,6 @@ def show_login_screen():
     
     tab1, tab2 = st.tabs(["تسجيل الدخول", "إنشاء حساب جديد"])
     
-    # --- تسجيل الدخول ---
     with tab1:
         st.subheader("تسجيل الدخول")
         login_phone = st.text_input("رقم الهاتف", key="login_phone", placeholder="مثال: 0791234567")
@@ -18,7 +17,6 @@ def show_login_screen():
                 try:
                     clean_phone = login_phone.replace(" ", "").strip()
                     dummy_email = f"{clean_phone}@deja.com"
-                    
                     res = supabase.auth.sign_in_with_password({"email": dummy_email, "password": login_password})
                     st.session_state['user'] = res.user
                     st.success("تم تسجيل الدخول بنجاح! جاري التوجيه...")
@@ -28,7 +26,6 @@ def show_login_screen():
             else:
                 st.warning("يرجى إدخال رقم الهاتف وكلمة المرور.")
 
-    # --- إنشاء حساب جديد ---
     with tab2:
         st.subheader("إنشاء حساب جديد")
         signup_name = st.text_input("الاسم الكامل", key="signup_name", placeholder="اسمك الثلاثي")
@@ -40,13 +37,12 @@ def show_login_screen():
                 try:
                     clean_phone = signup_phone.replace(" ", "").strip()
                     dummy_email = f"{clean_phone}@deja.com"
-                    
                     res = supabase.auth.sign_up({
                         "email": dummy_email, 
                         "password": signup_password,
                         "options": {"data": {"name": signup_name, "phone": clean_phone}}
                     })
-                    st.success(f"✅ تم إنشاء حسابك يا {signup_name} بنجاح! يمكنك الآن تسجيل الدخول من التبويب الأول.")
+                    st.success(f"✅ تم إنشاء حسابك يا {signup_name} بنجاح! يمكنك الآن تسجيل الدخول.")
                 except Exception as e:
                     st.error(f"❌ حدث خطأ، تأكد من كلمة المرور (6 أحرف) وأن الرقم غير مسجل. (الخطأ: {str(e)})")
             else:
