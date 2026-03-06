@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import os
+import sqlite3
 from supabase import create_client, Client
 
 # ==========================================
@@ -8,7 +10,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Deja Admin Panel", page_icon="👥", layout="wide")
 
 # ==========================================
-# 2. إدارة قاعدة البيانات والمصادقة
+# 2. إدارة قاعدة البيانات
 # ==========================================
 @st.cache_resource
 def init_connection():
@@ -94,7 +96,7 @@ if st.session_state['user'] is None:
                 st.warning("يرجى تعبئة جميع الحقول.")
 
 # ==========================================
-# 4. لوحة التحكم (تظهر بعد الدخول)
+# 4. لوحة التحكم 
 # ==========================================
 else:
     user_name = st.session_state['user'].user_metadata.get('name', 'عضو فريق Deja')
@@ -134,30 +136,19 @@ else:
                     st.success(f"تمت إضافة {name} بنجاح!")
                     st.rerun()
 
-    # --- أداة استيراد البيانات من ملف SQLite ---
-    st.markdown("---")
-    st.subheader("📥 استيراد بيانات الأعضاء من ملف SQLite القديم")
-    uploaded_sqlite = st.file_uploader("ارفع ملف قاعدة البيانات (.db أو .sqlite) هنا", type=['db', 'sqlite', 'sqlite3'])
-    
-    if uploaded_sqlite is not None:
-        if st.button("سحب البيانات لقاعدة Supabase 🚀", type="primary", use_container_width=True):
-            import sqlite3
-            import tempfile
-            import os
-
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tmp:
-                tmp.write(uploaded_sqlite.getvalue())
-                tmp_path = tmp.name
-
+    # --- زر الاستيراد السحري (يقرأ ملف deja.db من GitHub مباشرة) ---
+    if os.path.exists("deja.db"):
+        st.info("💡 تم العثور على ملف قاعدة البيانات (deja.db).")
+        if st.button("تنزيل البيانات إلى الجدول 🚀", type="primary"):
             try:
-                conn = sqlite3.connect(tmp_path)
+                conn = sqlite3.connect("deja.db")
                 cursor = conn.cursor()
+                
+                # البحث عن اسم الجدول
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
                 tables = cursor.fetchall()
-
-                if not tables:
-                    st.error("⚠️ الملف المرفوع فارغ أو لا يحتوي على جداول.")
-                else:
+                
+                if tables:
                     table_name = tables[0][0]
                     cursor.execute(f"SELECT * FROM {table_name}")
                     rows = cursor.fetchall()
@@ -166,35 +157,33 @@ else:
                     added_count = 0
                     for row in rows:
                         row_dict = dict(zip(column_names, row))
-                        name = str(row_dict.get("name", row_dict.get("الاسم", ""))).strip()
                         
-                        if name and name != "None":
-                            phone = str(row_dict.get("phone", row_dict.get("رقم الهاتف", "")))
-                            email = str(row_dict.get("email", row_dict.get("البريد الإلكتروني", "")))
-                            team = str(row_dict.get("team", row_dict.get("الفريق", "غير محدد")))
-                            role = str(row_dict.get("role", row_dict.get("الرتبة", "عضو")))
-                            notes = str(row_dict.get("notes", row_dict.get("ملاحظات", "")))
+                        # سحب اسم العضو
+                        n = str(row_dict.get("الاسم_بالعربية", "")).strip()
+                        
+                        if n and n != "None":
+                            p = str(row_dict.get("رقم_الهاتف", ""))
+                            e = str(row_dict.get("البريد_الإلكتروني", ""))
+                            t = str(row_dict.get("الفريق", "غير محدد"))
+                            r = str(row_dict.get("الرتبة", "عضو"))
+                            nts = str(row_dict.get("ملاحظات", ""))
                             
-                            if phone == "None": phone = ""
-                            if email == "None": email = ""
-                            if team == "None" or not team: team = "غير محدد"
-                            if role == "None" or not role: role = "عضو"
-                            if notes == "None": notes = ""
-                            
-                            points_raw = row_dict.get("points", row_dict.get("النقاط", 0))
-                            points = int(points_raw) if str(points_raw).isdigit() else 0
+                            if not t or t == "None": t = "غير محدد"
+                            if not r or r == "None": r = "عضو"
+                            if p == "None": p = ""
+                            if e == "None": e = ""
+                            if nts == "None": nts = ""
 
-                            db.add_member((name, phone, email, team, role, points, notes))
+                            db.add_member((n, p, e, t, r, 0, nts))
                             added_count += 1
-                    
-                    st.success(f"✅ تم سحب وإضافة {added_count} عضو بنجاح! اعمل تحديث للصفحة.")
-            except Exception as e:
-                st.error(f"❌ حدث خطأ أثناء قراءة الملف: {e}")
-            finally:
+                            
                 conn.close()
-                os.remove(tmp_path)
-    st.markdown("---")
+                st.success(f"✅ تم إضافة {added_count} عضو بنجاح! جاري التحديث...")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ حدث خطأ: {e}")
 
+    # --- عرض الجدول ---
     members_data = db.get_all_members()
     st.write(f"**إجمالي الأعضاء المسجلين:** {len(members_data)}")
 
