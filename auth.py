@@ -2,7 +2,7 @@ import streamlit as st
 from database import supabase
 
 def show_login_screen():
-    st.title("مرحبا بكم في فريق deja الالكتروني ")
+    st.title("مرحبا بكم في فريق (deja) الالكتروني ")
     st.markdown("يرجى تسجيل الدخول أو إنشاء حساب للدخول .")
     tab1, tab2 = st.tabs(["تسجيل الدخول", "إنشاء حساب جديد"])
     
@@ -46,6 +46,7 @@ def show_login_screen():
                     st.error(f"❌ حدث خطأ، تأكد من كلمة المرور (6 أحرف) وأن الرقم غير مسجل. (الخطأ: {str(e)})")
             else:
                 st.warning("يرجى تعبئة جميع الحقول.")
+
 
 
 
