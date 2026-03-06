@@ -136,15 +136,22 @@ else:
                     st.success(f"تمت إضافة {name} بنجاح!")
                     st.rerun()
 
-    # --- زر الاستيراد السحري (يقرأ ملف deja.db من GitHub مباشرة) ---
+    # --- زر الاستيراد السحري المحدث (لصيغة النصوص) ---
     if os.path.exists("deja.db"):
-        st.info("💡 تم العثور على ملف قاعدة البيانات (deja.db).")
+        st.info("💡 تم العثور على ملف البيانات (deja.db).")
         if st.button("تنزيل البيانات إلى الجدول 🚀", type="primary"):
             try:
-                conn = sqlite3.connect("deja.db")
+                # إنشاء قاعدة بيانات وهمية بالذاكرة
+                conn = sqlite3.connect(':memory:')
                 cursor = conn.cursor()
                 
-                # البحث عن اسم الجدول
+                # قراءة الملف وتشغيل الأكواد اللي جواته
+                with open("deja.db", "r", encoding="utf-8") as f:
+                    sql_script = f.read()
+                
+                cursor.executescript(sql_script)
+                
+                # سحب البيانات بعد ما ترتبت
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
                 tables = cursor.fetchall()
                 
@@ -158,7 +165,6 @@ else:
                     for row in rows:
                         row_dict = dict(zip(column_names, row))
                         
-                        # سحب اسم العضو
                         n = str(row_dict.get("الاسم_بالعربية", "")).strip()
                         
                         if n and n != "None":
