@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import json
 from database import db, supabase
 
 def show_dashboard_screen():
@@ -39,14 +40,13 @@ def show_dashboard_screen():
                     db.add_member((name, phone, email, team, role, points, notes))
                     st.success(f"تمت إضافة {name} بنجاح!")
                     st.rerun()
-# --- أداة استيراد البيانات من ملف JSON ---
-    st.markdown("---")
-    st.subheader("📥 استيراد بيانات الأعضاء القديمة (من ملف JSON)")
+
+    # --- أداة استيراد البيانات من ملف JSON ---
+    st.subheader("📥 استيراد بيانات الأعضاء القديمة")
     uploaded_file = st.file_uploader("ارفع ملف deja_data.JSON هنا", type=['json'])
     
     if uploaded_file is not None:
-        import json
-        if st.button("استيراد البيانات لقاعدة البيانات 🚀", type="primary"):
+        if st.button("استيراد البيانات لقاعدة البيانات 🚀", type="primary", use_container_width=True):
             try:
                 data = json.load(uploaded_file)
                 added_count = 0
@@ -64,20 +64,22 @@ def show_dashboard_screen():
                         
                         points = 0
                         
-                        # دمج التخصص والجامعة جوا حقل "الملاحظات" عشان ما يضيعوا
+                        # دمج التخصص والجامعة جوا الملاحظات
                         major = item.get("التخصص الجامعي", "")
                         uni = item.get("اسم الجامعة ان وجد", "")
                         notes = item.get("ملاحظات", "")
                         final_notes = f"{notes} | {major} - {uni}".strip(" | -")
 
-                        # إرسال البيانات لقاعدة بيانات Supabase
+                        # إرسال البيانات
                         db.add_member((name, phone, email, team, role, points, final_notes))
                         added_count += 1
                 
-                st.success(f"✅ تم سحب وإضافة {added_count} عضو بنجاح! اعمل تحديث (Refresh) للصفحة لتشوفهم بالجدول.")
+                st.success(f"✅ تم سحب وإضافة {added_count} عضو بنجاح! اعمل تحديث للصفحة.")
             except Exception as e:
                 st.error(f"❌ حدث خطأ: {e}")
     st.markdown("---")
+
+    # --- اللوحة الرئيسية (الجدول) ---
     members_data = db.get_all_members()
     st.write(f"**إجمالي الأعضاء المسجلين:** {len(members_data)}")
 
@@ -115,4 +117,3 @@ def show_dashboard_screen():
                     st.warning("يرجى اختيار عضو أولاً.")
     else:
         st.info("لا يوجد أعضاء مضافين حتى الآن. ابدأ بإضافة حسابات من القائمة الجانبية.")
-
