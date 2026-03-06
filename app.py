@@ -36,6 +36,18 @@ class DatabaseManager:
         }
         supabase.table("members").insert(row).execute()
 
+    def update_member(self, member_id, data):
+        row = {
+            "name": data[0],
+            "phone": data[1],
+            "email": data[2],
+            "team": data[3],
+            "role": data[4],
+            "points": data[5],
+            "notes": data[6]
+        }
+        supabase.table("members").update(row).eq("id", member_id).execute()
+
     def delete_member(self, member_id):
         supabase.table("members").delete().eq("id", member_id).execute()
 
@@ -136,25 +148,19 @@ else:
                     st.success(f"تمت إضافة {name} بنجاح!")
                     st.rerun()
 
-    # --- زر الاستيراد السحري المحدث (لصيغة النصوص) ---
+    # --- زر الاستيراد السحري لملف deja.db ---
     if os.path.exists("deja.db"):
         st.info("💡 تم العثور على ملف البيانات (deja.db).")
         if st.button("تنزيل البيانات إلى الجدول 🚀", type="primary"):
             try:
-                # إنشاء قاعدة بيانات وهمية بالذاكرة
                 conn = sqlite3.connect(':memory:')
                 cursor = conn.cursor()
-                
-                # قراءة الملف وتشغيل الأكواد اللي جواته
                 with open("deja.db", "r", encoding="utf-8") as f:
                     sql_script = f.read()
-                
                 cursor.executescript(sql_script)
                 
-                # سحب البيانات بعد ما ترتبت
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
                 tables = cursor.fetchall()
-                
                 if tables:
                     table_name = tables[0][0]
                     cursor.execute(f"SELECT * FROM {table_name}")
@@ -164,16 +170,13 @@ else:
                     added_count = 0
                     for row in rows:
                         row_dict = dict(zip(column_names, row))
-                        
                         n = str(row_dict.get("الاسم_بالعربية", "")).strip()
-                        
                         if n and n != "None":
                             p = str(row_dict.get("رقم_الهاتف", ""))
                             e = str(row_dict.get("البريد_الإلكتروني", ""))
                             t = str(row_dict.get("الفريق", "غير محدد"))
                             r = str(row_dict.get("الرتبة", "عضو"))
                             nts = str(row_dict.get("ملاحظات", ""))
-                            
                             if not t or t == "None": t = "غير محدد"
                             if not r or r == "None": r = "عضو"
                             if p == "None": p = ""
@@ -182,7 +185,6 @@ else:
 
                             db.add_member((n, p, e, t, r, 0, nts))
                             added_count += 1
-                            
                 conn.close()
                 st.success(f"✅ تم إضافة {added_count} عضو بنجاح! جاري التحديث...")
                 st.rerun()
@@ -209,18 +211,53 @@ else:
         st.dataframe(df_display, use_container_width=True, hide_index=True)
         st.markdown("---")
         
-        st.subheader("🗑️ إدارة الحسابات (حذف)")
-        del_col1, del_col2 = st.columns([3, 1])
-        with del_col1:
-            member_options = [f"{row['name']} (رقم: {row['id']})" for _, row in df.iterrows()]
-            selected_to_delete = st.selectbox("اختر العضو المراد حذفه:", [""] + member_options)
-        with del_col2:
-            st.write("")
-            st.write("")
-            if st.button("حذف الحساب المختار ❌", type="primary", use_container_width=True):
+        # --- قسم التعديل والحذف الجديد ---
+        col_edit, col_delete = st.columns(2)
+        
+        # 1. التعديل
+        with col_edit:
+            st.subheader("✏️ تعديل بيانات عضو")
+            edit_options = [f"{row['name']} (رقم: {row['id']})" for _, row in df.iterrows()]
+            selected_to_edit = st.selectbox("اختر العضو المراد تعديله:", [""] + edit_options, key="edit_select")
+            
+            if selected_to_edit:
+                member_id = int(selected_to_edit.split("(رقم: ")[1].replace(")", ""))
+                # استخراج بيانات العضو الحالية من الداتا فريم
+                current_data = df[df['id'] == member_id].iloc[0]
+                
+                with st.form("edit_form"):
+                    e_name = st.text_input("الاسم", value=current_data['name'])
+                    e_phone = st.text_input("رقم الهاتف", value=current_data['phone'])
+                    e_email = st.text_input("البريد الإلكتروني", value=current_data['email'])
+                    
+                    team_idx = TEAMS.index(current_data['team']) if current_data['team'] in TEAMS else 0
+                    e_team = st.selectbox("الفريق", TEAMS, index=team_idx)
+                    
+                    role_idx = ROLES.index(current_data['role']) if current_data['role'] in ROLES else 0
+                    e_role = st.selectbox("الرتبة", ROLES, index=role_idx)
+                    
+                    e_points = st.number_input("النقاط", value=int(current_data['points']), step=1)
+                    e_notes = st.text_area("ملاحظات", value=current_data['notes'])
+                    
+                    if st.form_submit_button("حفظ التعديلات 💾", type="primary", use_container_width=True):
+                        if not e_name.strip():
+                            st.error("⚠️ الاسم مطلوب!")
+                        else:
+                            db.update_member(member_id, (e_name, e_phone, e_email, e_team, e_role, e_points, e_notes))
+                            st.success("✅ تم التعديل بنجاح!")
+                            st.rerun()
+
+        # 2. الحذف
+        with col_delete:
+            st.subheader("🗑️ حذف حساب عضو")
+            delete_options = [f"{row['name']} (رقم: {row['id']})" for _, row in df.iterrows()]
+            selected_to_delete = st.selectbox("اختر العضو المراد حذفه:", [""] + delete_options, key="delete_select")
+            
+            st.write("") # مسافة للترتيب
+            if st.button("حذف الحساب نهائياً ❌", type="primary", use_container_width=True):
                 if selected_to_delete:
-                    member_id = int(selected_to_delete.split("(رقم: ")[1].replace(")", ""))
-                    db.delete_member(member_id)
+                    del_member_id = int(selected_to_delete.split("(رقم: ")[1].replace(")", ""))
+                    db.delete_member(del_member_id)
                     st.success("تم حذف الحساب بنجاح!")
                     st.rerun()
                 else:
