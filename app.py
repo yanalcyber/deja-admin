@@ -155,7 +155,7 @@ def member_details_dialog(member):
         st.rerun()
 
 # ==========================================
-# 4. واجهة الدخول 
+# 4. واجهة الدخول (تم التعديل لكشف الأخطاء)
 # ==========================================
 if st.session_state['user'] is None:
     st.markdown("<h1 style='text-align: center; color: #4CAF50;'>⚡ Deja Workspace</h1>", unsafe_allow_html=True)
@@ -176,24 +176,33 @@ if st.session_state['user'] is None:
                         res = supabase.auth.sign_in_with_password({"email": dummy_email, "password": login_password})
                         st.session_state['user'] = res.user
                         st.rerun()
-                    except:
-                        st.error("❌ بيانات الدخول غير صحيحة.")
+                    except Exception as e:
+                        # هون رح ينطبع الخطأ الحقيقي اللي مانعك تدخل!
+                        st.error(f"❌ فشل الدخول. تفاصيل الخطأ: {str(e)}")
+                else:
+                    st.warning("⚠️ يرجى إدخال رقم الهاتف وكلمة المرور أولاً.")
+                    
         with tab2:
             signup_name = st.text_input("الاسم الكامل")
             signup_phone = st.text_input("رقم الهاتف للتسجيل")
-            signup_password = st.text_input("كلمة المرور الجديدة", type="password")
+            signup_password = st.text_input("كلمة المرور الجديدة (6 أحرف/أرقام على الأقل)", type="password")
             if st.button("إنشاء الحساب ✍️", use_container_width=True):
                 if signup_name and signup_phone and signup_password:
-                    try:
-                        clean_phone = signup_phone.replace(" ", "").strip()
-                        dummy_email = f"{clean_phone}@deja.com"
-                        supabase.auth.sign_up({
-                            "email": dummy_email, "password": signup_password,
-                            "options": {"data": {"name": signup_name}}
-                        })
-                        st.success("تم الإنشاء بنجاح! يمكنك تسجيل الدخول الآن.")
-                    except:
-                        st.error("❌ حدث خطأ، تأكد من البيانات.")
+                    if len(signup_password) < 6:
+                        st.error("❌ كلمة المرور ضعيفة! يجب أن تتكون من 6 خانات على الأقل.")
+                    else:
+                        try:
+                            clean_phone = signup_phone.replace(" ", "").strip()
+                            dummy_email = f"{clean_phone}@deja.com"
+                            supabase.auth.sign_up({
+                                "email": dummy_email, "password": signup_password,
+                                "options": {"data": {"name": signup_name}}
+                            })
+                            st.success("تم الإنشاء بنجاح! يمكنك العودة لصفحة تسجيل الدخول الآن.")
+                        except Exception as e:
+                            st.error(f"❌ فشل إنشاء الحساب. تفاصيل الخطأ: {str(e)}")
+                else:
+                    st.warning("⚠️ يرجى تعبئة جميع الحقول قبل الضغط على الزر.")
 
 # ==========================================
 # 5. لوحة الإدارة الاحترافية (بعد الدخول)
@@ -217,9 +226,6 @@ else:
             st.session_state['user'] = None
             st.rerun()
 
-    # ------------------------------------------
-    # الصفحة 1: بطاقات الأعضاء (التصميم الملون)
-    # ------------------------------------------
     if menu == "👥 بطاقات الأعضاء":
         col_title, col_export = st.columns([3, 1])
         with col_title:
@@ -279,7 +285,6 @@ else:
                             <p style="margin:5px 0; font-size:14px; color:#4CAF50;"><strong>💯 النقاط:</strong> {member['points']}</p>
                         </div>
                         """
-                        # هاي الإضافة السحرية اللي بتمنع الكود ينطبع كنص
                         st.markdown(card_html, unsafe_allow_html=True)
                         
                         if st.button("المزيد ➕", key=f"more_{member['id']}", use_container_width=True):
@@ -287,9 +292,6 @@ else:
         else:
             st.info("لا يوجد أعضاء في الفريق حتى الآن.")
 
-    # ------------------------------------------
-    # الصفحة 2: لوحة القيادة
-    # ------------------------------------------
     elif menu == "📊 لوحة القيادة":
         st.title("📊 الإحصائيات العامة")
         if members_data:
@@ -323,9 +325,6 @@ else:
         else:
             st.info("لا يوجد بيانات لعرض الإحصائيات بعد.")
 
-    # ------------------------------------------
-    # الصفحة 3: إضافة عضو جديد
-    # ------------------------------------------
     elif menu == "➕ إضافة عضو جديد":
         st.title("➕ تسجيل عضو جديد")
         with st.form("add_form", clear_on_submit=True):
@@ -357,9 +356,6 @@ else:
                 else:
                     st.error("الاسم الإجباري!")
 
-    # ------------------------------------------
-    # الصفحة 4: الإعدادات (الأدوات)
-    # ------------------------------------------
     elif menu == "⚙️ الإعدادات":
         st.title("⚙️ إعدادات النظام")
         st.info("هذا القسم مخصص للعمليات التقنية وسحب البيانات القديمة.")
