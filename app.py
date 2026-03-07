@@ -9,16 +9,23 @@ from supabase import create_client, Client
 # ==========================================
 st.set_page_config(page_title="Deja Admin Pro", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# تصميم CSS احترافي (خطوط، ألوان، والبطاقات)
+# تصميم CSS احترافي (معدل لحل مشكلة تداخل الخطوط)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
     
+    /* تطبيق الخط على كامل الموقع */
     html, body, [class*="css"] {
-        font-family: 'Tajawal', sans-serif;
-        direction: rtl;
-        text-align: right;
+        font-family: 'Tajawal', sans-serif !important;
     }
+    
+    /* توجيه النصوص لليمين بشكل آمن بدون تخريب الأعمدة */
+    .stMarkdown, .stText, h1, h2, h3, h4, h5, h6, p, label, .stTextInput, .stSelectbox, .stTextArea {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+    
+    /* تصميم البطاقات للإحصائيات */
     .metric-card {
         background-color: #1E1E1E;
         border-radius: 10px;
@@ -26,7 +33,10 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         text-align: center;
         border-top: 4px solid #4CAF50;
+        direction: rtl;
     }
+    
+    /* إخفاء أدوات المطور الافتراضية */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
@@ -212,24 +222,21 @@ else:
         st.markdown("---")
 
         if members_data:
-            # فلترة الأعضاء حسب البحث
             filtered_members = []
             for m in members_data:
                 search_text = f"{m['name']} {m['phone']} {m.get('residence','')} {m['team']}".lower()
                 if not search_query or search_query.lower() in search_text:
                     filtered_members.append(m)
 
-            # ترتيب البطاقات في شبكة (Grid) كل سطر فيه 3 بطاقات
             cols = st.columns(3)
             for i, member in enumerate(filtered_members):
-                with cols[i % 3]: # توزيع البطاقات على الـ 3 أعمدة
-                    with st.container(border=True): # إنشاء إطار البطاقة
+                with cols[i % 3]: 
+                    with st.container(border=True): 
                         st.markdown(f"#### 👤 {member['name']}")
                         st.markdown(f"**الفريق:** {member['team']}")
                         st.markdown(f"**🏠 السكن:** {member.get('residence', '-')}")
                         st.markdown(f"**💯 النقاط:** {member['points']}")
                         
-                        # زر المزيد اللي بيفتح الشاشة المنبثقة
                         if st.button("المزيد ➕", key=f"more_{member['id']}", use_container_width=True):
                             member_details_dialog(member)
         else:
