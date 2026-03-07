@@ -57,7 +57,7 @@ class DatabaseManager:
             "name": data[0], "english_name": data[1], "phone": data[2], "email": data[3],
             "team": data[4], "role": data[5], "residence": data[6], "university": data[7],
             "major": data[8], "academic_year": data[9], "sports_experience": data[10],
-            "points": data[11], "notes": data[12]
+            "points": data[11], "notes": data[12], "gender": data[13] # ضفنا الجنس هون
         }
         supabase.table("members").insert(row).execute()
 
@@ -66,7 +66,7 @@ class DatabaseManager:
             "name": data[0], "english_name": data[1], "phone": data[2], "email": data[3],
             "team": data[4], "role": data[5], "residence": data[6], "university": data[7],
             "major": data[8], "academic_year": data[9], "sports_experience": data[10],
-            "points": data[11], "notes": data[12]
+            "points": data[11], "notes": data[12], "gender": data[13] # وضفناه هون
         }
         supabase.table("members").update(row).eq("id", member_id).execute()
 
@@ -79,9 +79,9 @@ class DatabaseManager:
 
 db = DatabaseManager()
 
-# تحديث قائمة الفرق بناءً على طلبك
 TEAMS = ["غير محدد", "فريق الإدارة", "فريق الميديا", "فريق IT", "فريق التنظيم", "فريق اللوجستك"]
 ROLES = ["عضو", "إداري", "قائد فريق"]
+GENDERS = ["غير محدد", "ذكر", "أنثى"]
 
 # ==========================================
 # 3. النافذة المنبثقة (البطاقة الكبيرة)
@@ -98,6 +98,7 @@ def member_details_dialog(member):
         st.write(f"👥 **الفريق:** {member['team']}")
         st.write(f"🎓 **الجامعة:** {member.get('university', '-')}")
         st.write(f"📅 **السنة:** {member.get('academic_year', '-')}")
+        st.write(f"⚥ **الجنس:** {member.get('gender', 'غير محدد')}")
     with c2:
         st.write(f"📧 **الإيميل:** {member['email']}")
         st.write(f"⭐ **الرتبة:** {member['role']}")
@@ -114,7 +115,14 @@ def member_details_dialog(member):
         with st.form(key=f"edit_form_{member['id']}"):
             e_name = st.text_input("الاسم", value=member['name'])
             e_eng = st.text_input("الاسم بالإنجليزي", value=member.get('english_name', ''))
-            e_phone = st.text_input("رقم الهاتف", value=member['phone'])
+            
+            c_g1, c_g2 = st.columns(2)
+            with c_g1:
+                e_phone = st.text_input("رقم الهاتف", value=member['phone'])
+            with c_g2:
+                g_idx = GENDERS.index(member.get('gender', 'غير محدد')) if member.get('gender', 'غير محدد') in GENDERS else 0
+                e_gender = st.selectbox("الجنس", GENDERS, index=g_idx)
+
             e_email = st.text_input("الإيميل", value=member['email'])
             
             t_idx = TEAMS.index(member['team']) if member['team'] in TEAMS else 0
@@ -136,11 +144,11 @@ def member_details_dialog(member):
             
             if st.form_submit_button("حفظ التحديثات ✅", use_container_width=True):
                 try:
-                    db.update_member(member['id'], (e_name, e_eng, e_phone, e_email, e_team, e_role, e_res, e_uni, e_maj, e_ay, e_se, e_pts, e_notes))
+                    db.update_member(member['id'], (e_name, e_eng, e_phone, e_email, e_team, e_role, e_res, e_uni, e_maj, e_ay, e_se, e_pts, e_notes, e_gender))
                     st.success("تم الحفظ بنجاح! جاري تحديث الصفحة...")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"❌ خطأ من قاعدة البيانات: تأكد من أسماء الأعمدة في Supabase. التفاصيل: {str(e)}")
+                    st.error(f"❌ خطأ: هل تأكدت من إضافة عمود `gender` في Supabase؟ التفاصيل: {str(e)}")
                 
     if st.button("حذف الحساب نهائياً ❌", type="secondary", use_container_width=True):
         db.delete_member(member['id'])
@@ -199,11 +207,9 @@ else:
         st.markdown("---")
         menu = st.radio("القائمة الرئيسية:", ["👥 بطاقات الأعضاء", "📊 لوحة القيادة", "➕ إضافة عضو جديد", "⚙️ الإعدادات"])
         
-        # === القسم الجديد: فلاتر الفرق السريعة ===
         st.markdown("---")
         st.markdown("### 🏷️ تصفية حسب الفريق")
         selected_team_filter = st.radio("عرض فريق محدد:", ["الكل"] + TEAMS)
-        # ==========================================
 
         st.markdown("---")
         if st.button("تسجيل الخروج 🚪", use_container_width=True):
@@ -212,12 +218,11 @@ else:
             st.rerun()
 
     # ------------------------------------------
-    # الصفحة 1: بطاقات الأعضاء
+    # الصفحة 1: بطاقات الأعضاء (التصميم الملون الجديد)
     # ------------------------------------------
     if menu == "👥 بطاقات الأعضاء":
         col_title, col_export = st.columns([3, 1])
         with col_title:
-            # تغيير العنوان حسب الفريق المختار
             if selected_team_filter == "الكل":
                 st.title("📇 بطاقات فريق Deja")
             else:
@@ -236,10 +241,7 @@ else:
             filtered_members = []
             for m in members_data:
                 search_text = f"{m['name']} {m['phone']} {m.get('residence','')} {m['team']}".lower()
-                
-                # شرط 1: البحث النصي
                 match_search = not search_query or search_query.lower() in search_text
-                # شرط 2: فلتر الفريق الجانبي
                 match_team = (selected_team_filter == "الكل") or (m['team'] == selected_team_filter)
                 
                 if match_search and match_team:
@@ -251,14 +253,44 @@ else:
                 cols = st.columns(3)
                 for i, member in enumerate(filtered_members):
                     with cols[i % 3]: 
-                        with st.container(border=True): 
-                            st.markdown(f"#### 👤 {member['name']}")
-                            st.markdown(f"**الفريق:** {member['team']}")
-                            st.markdown(f"**🏠 السكن:** {member.get('residence', '-')}")
-                            st.markdown(f"**💯 النقاط:** {member['points']}")
+                        # تحديد لون خلفية البطاقة حسب الجنس
+                        bg_color = "#1E1E1E" # اللون الافتراضي الداكن
+                        gender = member.get('gender', 'غير محدد')
+                        if gender == "ذكر":
+                            bg_color = "#0e2038" # أزرق داكن للشباب
+                        elif gender == "أنثى":
+                            bg_color = "#361125" # زهري/بنفسجي داكن للبنات
+
+                        # توليد الأوسمة (Badges) بناءً على الرتبة والفريق
+                        badges = ""
+                        # وسام إداري (أصفر)
+                        if member['role'] in ['إداري', 'قائد فريق']:
+                            badges += f"<div style='background-color:#FFD700; color:#000; padding:2px 10px; border-radius:15px; font-size:12px; font-weight:bold;'>{member['role']}</div>"
+                        # وسام فريق الميديا (أحمر)
+                        if member['team'] == 'فريق الميديا':
+                            badges += "<div style='background-color:#E53935; color:#FFF; padding:2px 10px; border-radius:15px; font-size:12px; font-weight:bold;'>ميديا 📸</div>"
+                        # وسام فريق الـ IT (أخضر)
+                        if member['team'] == 'فريق IT':
+                            badges += "<div style='background-color:#4CAF50; color:#FFF; padding:2px 10px; border-radius:15px; font-size:12px; font-weight:bold;'>IT 💻</div>"
+                        
+                        # رسم البطاقة الملونة باستخدام HTML
+                        card_html = f"""
+                        <div style='background-color:{bg_color}; padding:20px; border-radius:12px; border: 1px solid #333; position:relative; min-height:170px; margin-bottom:15px;'>
+                            <div style='position:absolute; top:10px; left:10px; display:flex; flex-direction:column; gap:5px;'>
+                                {badges}
+                            </div>
                             
-                            if st.button("المزيد ➕", key=f"more_{member['id']}", use_container_width=True):
-                                member_details_dialog(member)
+                            <h4 style='margin-top:0; color:#FFF;'>👤 {member['name']}</h4>
+                            <p style='margin:5px 0; font-size:14px; color:#CCC;'><strong>الفريق:</strong> {member['team']}</p>
+                            <p style='margin:5px 0; font-size:14px; color:#CCC;'><strong>🏠 السكن:</strong> {member.get('residence', '-')}</p>
+                            <p style='margin:5px 0; font-size:14px; color:#4CAF50;'><strong>💯 النقاط:</strong> {member['points']}</p>
+                        </div>
+                        """
+                        st.markdown(card_html, unsafe_allow_html=True)
+                        
+                        # زر المزيد تحت البطاقة
+                        if st.button("المزيد ➕", key=f"more_{member['id']}", use_container_width=True):
+                            member_details_dialog(member)
         else:
             st.info("لا يوجد أعضاء في الفريق حتى الآن.")
 
@@ -267,26 +299,21 @@ else:
     # ------------------------------------------
     elif menu == "📊 لوحة القيادة":
         st.title("📊 الإحصائيات العامة")
-        
         if members_data:
             df = pd.DataFrame(members_data)
-            
-            # فلترة الإحصائيات حسب الفريق المختار من القائمة الجانبية
             if selected_team_filter != "الكل":
                 df = df[df['team'] == selected_team_filter]
                 st.info(f"💡 هذه الإحصائيات مخصصة لـ: **{selected_team_filter}**")
-            
             if not df.empty:
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     st.markdown(f"<div class='metric-card'><h3>👥 إجمالي الأعضاء</h3><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
                 with c2:
-                    admins = len(df[df['role'] == 'إداري'])
+                    admins = len(df[df['role'].isin(['إداري', 'قائد فريق'])])
                     st.markdown(f"<div class='metric-card'><h3>⭐ الإداريين</h3><h2>{admins}</h2></div>", unsafe_allow_html=True)
                 with c3:
                     top_points = df['points'].max()
                     st.markdown(f"<div class='metric-card'><h3>🏆 أعلى نقاط</h3><h2>{top_points}</h2></div>", unsafe_allow_html=True)
-                
                 st.write("---")
                 col_chart, col_leader = st.columns([2, 1])
                 with col_chart:
@@ -312,6 +339,7 @@ else:
             c1, c2 = st.columns(2)
             with c1:
                 name = st.text_input("الاسم باللغة العربية *")
+                gender = st.selectbox("الجنس", GENDERS)
                 phone = st.text_input("رقم الهاتف")
                 team = st.selectbox("الفريق", TEAMS)
                 university = st.text_input("الجامعة")
@@ -329,10 +357,10 @@ else:
             if st.form_submit_button("إضافة العضو للقاعدة 🚀", type="primary", use_container_width=True):
                 if name.strip():
                     try:
-                        db.add_member((name, english_name, phone, email, team, role, residence, university, major, academic_year, sports_experience, 0, notes))
+                        db.add_member((name, english_name, phone, email, team, role, residence, university, major, academic_year, sports_experience, 0, notes, gender))
                         st.success("تمت الإضافة بنجاح!")
                     except Exception as e:
-                        st.error(f"❌ خطأ من قاعدة البيانات: تأكد من أسماء الأعمدة في Supabase. التفاصيل: {str(e)}")
+                        st.error(f"❌ خطأ: هل تأكدت من إضافة عمود `gender` في Supabase؟ التفاصيل: {str(e)}")
                 else:
                     st.error("الاسم الإجباري!")
 
@@ -360,7 +388,7 @@ else:
                         d = dict(zip(cols, row))
                         n = str(d.get("الاسم_بالعربية", "")).strip()
                         if n and n != "None":
-                            db.add_member((n, str(d.get("الاسم_بالانجليزية", "")).strip(), str(d.get("رقم_الهاتف", "")), "", str(d.get("الفريق", "غير محدد")), "عضو", str(d.get("مكان_السكن", "")), str(d.get("الجامعة", "")), str(d.get("التخصص", "")), str(d.get("السنة_الدراسية", "")), str(d.get("الخبرة_الرياضية", "")), 0, ""))
+                            db.add_member((n, str(d.get("الاسم_بالانجليزية", "")).strip(), str(d.get("رقم_الهاتف", "")), "", str(d.get("الفريق", "غير محدد")), "عضو", str(d.get("مكان_السكن", "")), str(d.get("الجامعة", "")), str(d.get("التخصص", "")), str(d.get("السنة_الدراسية", "")), str(d.get("الخبرة_الرياضية", "")), 0, "", "غير محدد"))
                             count += 1
                     st.success(f"تم سحب {count} عضو!")
                     st.rerun()
