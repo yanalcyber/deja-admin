@@ -155,7 +155,7 @@ def member_details_dialog(member):
         st.rerun()
 
 # ==========================================
-# 4. واجهة الدخول (تم التعديل لكشف الأخطاء)
+# 4. واجهة الدخول
 # ==========================================
 if st.session_state['user'] is None:
     st.markdown("<h1 style='text-align: center; color: #4CAF50;'>⚡ Deja Workspace</h1>", unsafe_allow_html=True)
@@ -177,7 +177,6 @@ if st.session_state['user'] is None:
                         st.session_state['user'] = res.user
                         st.rerun()
                     except Exception as e:
-                        # هون رح ينطبع الخطأ الحقيقي اللي مانعك تدخل!
                         st.error(f"❌ فشل الدخول. تفاصيل الخطأ: {str(e)}")
                 else:
                     st.warning("⚠️ يرجى إدخال رقم الهاتف وكلمة المرور أولاً.")
@@ -274,17 +273,9 @@ else:
                         if member['team'] == 'فريق IT':
                             badges += "<div style='background-color:#4CAF50; color:#FFF; padding:4px 12px; border-radius:15px; font-size:12px; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);'>IT 💻</div>"
                         
-                        card_html = f"""
-                        <div style="background-color:{bg_color}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:180px; margin-bottom:15px; direction:rtl; text-align:right;">
-                            <div style="position:absolute; top:15px; left:15px; display:flex; flex-direction:column; gap:8px;">
-                                {badges}
-                            </div>
-                            <h4 style="margin-top:0; margin-bottom:10px; color:#FFF; font-size: 18px;">👤 {member['name']}</h4>
-                            <p style="margin:5px 0; font-size:14px; color:#DDD;"><strong>الفريق:</strong> {member['team']}</p>
-                            <p style="margin:5px 0; font-size:14px; color:#DDD;"><strong>🏠 السكن:</strong> {member.get('residence', '-')}</p>
-                            <p style="margin:5px 0; font-size:14px; color:#4CAF50;"><strong>💯 النقاط:</strong> {member['points']}</p>
-                        </div>
-                        """
+                        # السحر هون: كل الـ HTML بسطر واحد عشان ما يتلخبط النظام
+                        card_html = f"<div style='background-color:{bg_color}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:180px; margin-bottom:15px; direction:rtl; text-align:right;'><div style='position:absolute; top:15px; left:15px; display:flex; flex-direction:column; gap:8px;'>{badges}</div><h4 style='margin-top:0; margin-bottom:10px; color:#FFF; font-size: 18px;'>👤 {member['name']}</h4><p style='margin:5px 0; font-size:14px; color:#DDD;'><strong>الفريق:</strong> {member['team']}</p><p style='margin:5px 0; font-size:14px; color:#DDD;'><strong>🏠 السكن:</strong> {member.get('residence', '-')}</p><p style='margin:5px 0; font-size:14px; color:#4CAF50;'><strong>💯 النقاط:</strong> {member['points']}</p></div>"
+                        
                         st.markdown(card_html, unsafe_allow_html=True)
                         
                         if st.button("المزيد ➕", key=f"more_{member['id']}", use_container_width=True):
