@@ -17,7 +17,7 @@ st.markdown("""
         font-family: 'Tajawal', sans-serif !important;
     }
     
-    .stMarkdown, .stText, h1, h2, h3, h4, h5, h6, p, label, .stTextInput, .stSelectbox, .stTextArea {
+    .stMarkdown, .stText, h1, h2, h3, h4, h5, h6, p, label, .stTextInput, .stSelectbox, .stTextArea, .stRadio {
         direction: rtl !important;
         text-align: right !important;
     }
@@ -79,11 +79,12 @@ class DatabaseManager:
 
 db = DatabaseManager()
 
-TEAMS = ["غير محدد", "فريق ميديا", "فريق IT"]
-ROLES = ["عضو", "إداري"]
+# تحديث قائمة الفرق بناءً على طلبك
+TEAMS = ["غير محدد", "فريق الإدارة", "فريق الميديا", "فريق IT", "فريق التنظيم", "فريق اللوجستك"]
+ROLES = ["عضو", "إداري", "قائد فريق"]
 
 # ==========================================
-# 3. النافذة المنبثقة (البطاقة الكبيرة للتفاصيل والتعديل)
+# 3. النافذة المنبثقة (البطاقة الكبيرة)
 # ==========================================
 @st.dialog("🪪 بطاقة العضو الشاملة")
 def member_details_dialog(member):
@@ -109,7 +110,6 @@ def member_details_dialog(member):
     
     st.markdown("---")
     
-    # قسم التعديل المحمي من الانهيار (Crash-proof)
     with st.expander("✏️ تعديل بيانات العضو"):
         with st.form(key=f"edit_form_{member['id']}"):
             e_name = st.text_input("الاسم", value=member['name'])
@@ -126,10 +126,9 @@ def member_details_dialog(member):
             e_res = st.text_input("السكن", value=member.get('residence', ''))
             e_uni = st.text_input("الجامعة", value=member.get('university', ''))
             e_maj = st.text_input("التخصص", value=member.get('major', ''))
-            e_ay = st.text_input("السنة", value=member.get('academic_year', ''))
+            e_ay = st.text_input("السنة الدراسية", value=member.get('academic_year', ''))
             e_se = st.text_area("الخبرة", value=member.get('sports_experience', ''))
             
-            # حماية إضافية لو كانت النقاط غير موجودة
             safe_points = int(member['points']) if member.get('points') is not None else 0
             e_pts = st.number_input("النقاط", value=safe_points, step=1)
             
@@ -199,6 +198,13 @@ else:
         st.markdown(f"### 👨‍💻 أهلاً، **{user_name}**")
         st.markdown("---")
         menu = st.radio("القائمة الرئيسية:", ["👥 بطاقات الأعضاء", "📊 لوحة القيادة", "➕ إضافة عضو جديد", "⚙️ الإعدادات"])
+        
+        # === القسم الجديد: فلاتر الفرق السريعة ===
+        st.markdown("---")
+        st.markdown("### 🏷️ تصفية حسب الفريق")
+        selected_team_filter = st.radio("عرض فريق محدد:", ["الكل"] + TEAMS)
+        # ==========================================
+
         st.markdown("---")
         if st.button("تسجيل الخروج 🚪", use_container_width=True):
             supabase.auth.sign_out()
@@ -211,7 +217,12 @@ else:
     if menu == "👥 بطاقات الأعضاء":
         col_title, col_export = st.columns([3, 1])
         with col_title:
-            st.title("📇 بطاقات فريق Deja")
+            # تغيير العنوان حسب الفريق المختار
+            if selected_team_filter == "الكل":
+                st.title("📇 بطاقات فريق Deja")
+            else:
+                st.title(f"📇 {selected_team_filter}")
+                
         with col_export:
             if members_data:
                 df = pd.DataFrame(members_data)
@@ -225,20 +236,29 @@ else:
             filtered_members = []
             for m in members_data:
                 search_text = f"{m['name']} {m['phone']} {m.get('residence','')} {m['team']}".lower()
-                if not search_query or search_query.lower() in search_text:
+                
+                # شرط 1: البحث النصي
+                match_search = not search_query or search_query.lower() in search_text
+                # شرط 2: فلتر الفريق الجانبي
+                match_team = (selected_team_filter == "الكل") or (m['team'] == selected_team_filter)
+                
+                if match_search and match_team:
                     filtered_members.append(m)
 
-            cols = st.columns(3)
-            for i, member in enumerate(filtered_members):
-                with cols[i % 3]: 
-                    with st.container(border=True): 
-                        st.markdown(f"#### 👤 {member['name']}")
-                        st.markdown(f"**الفريق:** {member['team']}")
-                        st.markdown(f"**🏠 السكن:** {member.get('residence', '-')}")
-                        st.markdown(f"**💯 النقاط:** {member['points']}")
-                        
-                        if st.button("المزيد ➕", key=f"more_{member['id']}", use_container_width=True):
-                            member_details_dialog(member)
+            if not filtered_members:
+                st.warning("⚠️ لا يوجد أعضاء يطابقون الفلتر المختار.")
+            else:
+                cols = st.columns(3)
+                for i, member in enumerate(filtered_members):
+                    with cols[i % 3]: 
+                        with st.container(border=True): 
+                            st.markdown(f"#### 👤 {member['name']}")
+                            st.markdown(f"**الفريق:** {member['team']}")
+                            st.markdown(f"**🏠 السكن:** {member.get('residence', '-')}")
+                            st.markdown(f"**💯 النقاط:** {member['points']}")
+                            
+                            if st.button("المزيد ➕", key=f"more_{member['id']}", use_container_width=True):
+                                member_details_dialog(member)
         else:
             st.info("لا يوجد أعضاء في الفريق حتى الآن.")
 
@@ -250,27 +270,36 @@ else:
         
         if members_data:
             df = pd.DataFrame(members_data)
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.markdown(f"<div class='metric-card'><h3>👥 إجمالي الأعضاء</h3><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
-            with c2:
-                admins = len(df[df['role'] == 'إداري'])
-                st.markdown(f"<div class='metric-card'><h3>⭐ الإداريين</h3><h2>{admins}</h2></div>", unsafe_allow_html=True)
-            with c3:
-                top_points = df['points'].max()
-                st.markdown(f"<div class='metric-card'><h3>🏆 أعلى نقاط</h3><h2>{top_points}</h2></div>", unsafe_allow_html=True)
             
-            st.write("---")
-            col_chart, col_leader = st.columns([2, 1])
-            with col_chart:
-                st.subheader("📈 توزيع الأعضاء حسب الفرق")
-                team_counts = df['team'].value_counts()
-                st.bar_chart(team_counts)
-            with col_leader:
-                st.subheader("🔥 أعلى 5 نقاط")
-                top_5 = df.nlargest(5, 'points')[['name', 'points']]
-                for idx, row in top_5.iterrows():
-                    st.success(f"**{row['name']}** - {row['points']} نقطة")
+            # فلترة الإحصائيات حسب الفريق المختار من القائمة الجانبية
+            if selected_team_filter != "الكل":
+                df = df[df['team'] == selected_team_filter]
+                st.info(f"💡 هذه الإحصائيات مخصصة لـ: **{selected_team_filter}**")
+            
+            if not df.empty:
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.markdown(f"<div class='metric-card'><h3>👥 إجمالي الأعضاء</h3><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
+                with c2:
+                    admins = len(df[df['role'] == 'إداري'])
+                    st.markdown(f"<div class='metric-card'><h3>⭐ الإداريين</h3><h2>{admins}</h2></div>", unsafe_allow_html=True)
+                with c3:
+                    top_points = df['points'].max()
+                    st.markdown(f"<div class='metric-card'><h3>🏆 أعلى نقاط</h3><h2>{top_points}</h2></div>", unsafe_allow_html=True)
+                
+                st.write("---")
+                col_chart, col_leader = st.columns([2, 1])
+                with col_chart:
+                    st.subheader("📈 توزيع الأعضاء حسب الفرق")
+                    team_counts = df['team'].value_counts()
+                    st.bar_chart(team_counts)
+                with col_leader:
+                    st.subheader("🔥 أعلى 5 نقاط")
+                    top_5 = df.nlargest(5, 'points')[['name', 'points']]
+                    for idx, row in top_5.iterrows():
+                        st.success(f"**{row['name']}** - {row['points']} نقطة")
+            else:
+                st.warning("⚠️ لا يوجد بيانات لهذا الفريق.")
         else:
             st.info("لا يوجد بيانات لعرض الإحصائيات بعد.")
 
