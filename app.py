@@ -57,7 +57,7 @@ class DatabaseManager:
             "name": data[0], "english_name": data[1], "phone": data[2], "email": data[3],
             "team": data[4], "role": data[5], "residence": data[6], "university": data[7],
             "major": data[8], "academic_year": data[9], "sports_experience": data[10],
-            "points": data[11], "notes": data[12], "gender": data[13] # ضفنا الجنس هون
+            "points": data[11], "notes": data[12], "gender": data[13]
         }
         supabase.table("members").insert(row).execute()
 
@@ -66,7 +66,7 @@ class DatabaseManager:
             "name": data[0], "english_name": data[1], "phone": data[2], "email": data[3],
             "team": data[4], "role": data[5], "residence": data[6], "university": data[7],
             "major": data[8], "academic_year": data[9], "sports_experience": data[10],
-            "points": data[11], "notes": data[12], "gender": data[13] # وضفناه هون
+            "points": data[11], "notes": data[12], "gender": data[13]
         }
         supabase.table("members").update(row).eq("id", member_id).execute()
 
@@ -218,7 +218,7 @@ else:
             st.rerun()
 
     # ------------------------------------------
-    # الصفحة 1: بطاقات الأعضاء (التصميم الملون الجديد)
+    # الصفحة 1: بطاقات الأعضاء (التصميم الملون)
     # ------------------------------------------
     if menu == "👥 بطاقات الأعضاء":
         col_title, col_export = st.columns([3, 1])
@@ -253,42 +253,35 @@ else:
                 cols = st.columns(3)
                 for i, member in enumerate(filtered_members):
                     with cols[i % 3]: 
-                        # تحديد لون خلفية البطاقة حسب الجنس
-                        bg_color = "#1E1E1E" # اللون الافتراضي الداكن
+                        bg_color = "#1E1E1E" 
                         gender = member.get('gender', 'غير محدد')
                         if gender == "ذكر":
-                            bg_color = "#0e2038" # أزرق داكن للشباب
+                            bg_color = "#0e2038" 
                         elif gender == "أنثى":
-                            bg_color = "#361125" # زهري/بنفسجي داكن للبنات
+                            bg_color = "#361125" 
 
-                        # توليد الأوسمة (Badges) بناءً على الرتبة والفريق
                         badges = ""
-                        # وسام إداري (أصفر)
                         if member['role'] in ['إداري', 'قائد فريق']:
-                            badges += f"<div style='background-color:#FFD700; color:#000; padding:2px 10px; border-radius:15px; font-size:12px; font-weight:bold;'>{member['role']}</div>"
-                        # وسام فريق الميديا (أحمر)
+                            badges += f"<div style='background-color:#FFD700; color:#000; padding:4px 12px; border-radius:15px; font-size:12px; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);'>{member['role']}</div>"
                         if member['team'] == 'فريق الميديا':
-                            badges += "<div style='background-color:#E53935; color:#FFF; padding:2px 10px; border-radius:15px; font-size:12px; font-weight:bold;'>ميديا 📸</div>"
-                        # وسام فريق الـ IT (أخضر)
+                            badges += "<div style='background-color:#E53935; color:#FFF; padding:4px 12px; border-radius:15px; font-size:12px; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);'>ميديا 📸</div>"
                         if member['team'] == 'فريق IT':
-                            badges += "<div style='background-color:#4CAF50; color:#FFF; padding:2px 10px; border-radius:15px; font-size:12px; font-weight:bold;'>IT 💻</div>"
+                            badges += "<div style='background-color:#4CAF50; color:#FFF; padding:4px 12px; border-radius:15px; font-size:12px; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);'>IT 💻</div>"
                         
-                        # رسم البطاقة الملونة باستخدام HTML
                         card_html = f"""
-                        <div style='background-color:{bg_color}; padding:20px; border-radius:12px; border: 1px solid #333; position:relative; min-height:170px; margin-bottom:15px;'>
-                            <div style='position:absolute; top:10px; left:10px; display:flex; flex-direction:column; gap:5px;'>
+                        <div style="background-color:{bg_color}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:180px; margin-bottom:15px; direction:rtl; text-align:right;">
+                            <div style="position:absolute; top:15px; left:15px; display:flex; flex-direction:column; gap:8px;">
                                 {badges}
                             </div>
-                            
-                            <h4 style='margin-top:0; color:#FFF;'>👤 {member['name']}</h4>
-                            <p style='margin:5px 0; font-size:14px; color:#CCC;'><strong>الفريق:</strong> {member['team']}</p>
-                            <p style='margin:5px 0; font-size:14px; color:#CCC;'><strong>🏠 السكن:</strong> {member.get('residence', '-')}</p>
-                            <p style='margin:5px 0; font-size:14px; color:#4CAF50;'><strong>💯 النقاط:</strong> {member['points']}</p>
+                            <h4 style="margin-top:0; margin-bottom:10px; color:#FFF; font-size: 18px;">👤 {member['name']}</h4>
+                            <p style="margin:5px 0; font-size:14px; color:#DDD;"><strong>الفريق:</strong> {member['team']}</p>
+                            <p style="margin:5px 0; font-size:14px; color:#DDD;"><strong>🏠 السكن:</strong> {member.get('residence', '-')}</p>
+                            <p style="margin:5px 0; font-size:14px; color:#4CAF50;"><strong>💯 النقاط:</strong> {member['points']}</p>
                         </div>
                         """
+                        # هاي الإضافة السحرية اللي بتمنع الكود ينطبع كنص
                         st.markdown(card_html, unsafe_allow_html=True)
                         
-                        # زر المزيد تحت البطاقة
                         if st.button("المزيد ➕", key=f"more_{member['id']}", use_container_width=True):
                             member_details_dialog(member)
         else:
