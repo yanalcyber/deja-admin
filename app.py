@@ -9,23 +9,19 @@ from supabase import create_client, Client
 # ==========================================
 st.set_page_config(page_title="Deja Admin Pro", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# تصميم CSS احترافي (معدل لحل مشكلة تداخل الخطوط)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
     
-    /* تطبيق الخط على كامل الموقع */
     html, body, [class*="css"] {
         font-family: 'Tajawal', sans-serif !important;
     }
     
-    /* توجيه النصوص لليمين بشكل آمن بدون تخريب الأعمدة */
     .stMarkdown, .stText, h1, h2, h3, h4, h5, h6, p, label, .stTextInput, .stSelectbox, .stTextArea {
         direction: rtl !important;
         text-align: right !important;
     }
     
-    /* تصميم البطاقات للإحصائيات */
     .metric-card {
         background-color: #1E1E1E;
         border-radius: 10px;
@@ -36,7 +32,6 @@ st.markdown("""
         direction: rtl;
     }
     
-    /* إخفاء أدوات المطور الافتراضية */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
@@ -92,7 +87,6 @@ ROLES = ["عضو", "إداري"]
 # ==========================================
 @st.dialog("🪪 بطاقة العضو الشاملة")
 def member_details_dialog(member):
-    # عرض المعلومات الأساسية بشكل مرتب
     st.markdown(f"<h3 style='text-align: center; color: #4CAF50;'>{member['name']}</h3>", unsafe_allow_html=True)
     st.markdown(f"<p style='text-align: center;'>{member.get('english_name', '-')}</p>", unsafe_allow_html=True)
     st.markdown("---")
@@ -115,7 +109,7 @@ def member_details_dialog(member):
     
     st.markdown("---")
     
-    # قسم التعديل داخل البطاقة
+    # قسم التعديل المحمي من الانهيار (Crash-proof)
     with st.expander("✏️ تعديل بيانات العضو"):
         with st.form(key=f"edit_form_{member['id']}"):
             e_name = st.text_input("الاسم", value=member['name'])
@@ -134,14 +128,21 @@ def member_details_dialog(member):
             e_maj = st.text_input("التخصص", value=member.get('major', ''))
             e_ay = st.text_input("السنة", value=member.get('academic_year', ''))
             e_se = st.text_area("الخبرة", value=member.get('sports_experience', ''))
-            e_pts = st.number_input("النقاط", value=int(member['points']), step=1)
+            
+            # حماية إضافية لو كانت النقاط غير موجودة
+            safe_points = int(member['points']) if member.get('points') is not None else 0
+            e_pts = st.number_input("النقاط", value=safe_points, step=1)
+            
             e_notes = st.text_area("ملاحظات", value=member.get('notes', ''))
             
             if st.form_submit_button("حفظ التحديثات ✅", use_container_width=True):
-                db.update_member(member['id'], (e_name, e_eng, e_phone, e_email, e_team, e_role, e_res, e_uni, e_maj, e_ay, e_se, e_pts, e_notes))
-                st.rerun()
+                try:
+                    db.update_member(member['id'], (e_name, e_eng, e_phone, e_email, e_team, e_role, e_res, e_uni, e_maj, e_ay, e_se, e_pts, e_notes))
+                    st.success("تم الحفظ بنجاح! جاري تحديث الصفحة...")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ خطأ من قاعدة البيانات: تأكد من أسماء الأعمدة في Supabase. التفاصيل: {str(e)}")
                 
-    # زر الحذف في أسفل البطاقة
     if st.button("حذف الحساب نهائياً ❌", type="secondary", use_container_width=True):
         db.delete_member(member['id'])
         st.rerun()
@@ -194,7 +195,6 @@ else:
     user_name = st.session_state['user'].user_metadata.get('name', 'مدير النظام')
     members_data = db.get_all_members()
 
-    # القائمة الجانبية القابلة للطي (Sidebar)
     with st.sidebar:
         st.markdown(f"### 👨‍💻 أهلاً، **{user_name}**")
         st.markdown("---")
@@ -206,7 +206,7 @@ else:
             st.rerun()
 
     # ------------------------------------------
-    # الصفحة 1: بطاقات الأعضاء (نظام البطاقات الجديد)
+    # الصفحة 1: بطاقات الأعضاء
     # ------------------------------------------
     if menu == "👥 بطاقات الأعضاء":
         col_title, col_export = st.columns([3, 1])
@@ -243,7 +243,7 @@ else:
             st.info("لا يوجد أعضاء في الفريق حتى الآن.")
 
     # ------------------------------------------
-    # الصفحة 2: لوحة القيادة (Dashboard)
+    # الصفحة 2: لوحة القيادة
     # ------------------------------------------
     elif menu == "📊 لوحة القيادة":
         st.title("📊 الإحصائيات العامة")
@@ -299,8 +299,11 @@ else:
             
             if st.form_submit_button("إضافة العضو للقاعدة 🚀", type="primary", use_container_width=True):
                 if name.strip():
-                    db.add_member((name, english_name, phone, email, team, role, residence, university, major, academic_year, sports_experience, 0, notes))
-                    st.success("تمت الإضافة بنجاح!")
+                    try:
+                        db.add_member((name, english_name, phone, email, team, role, residence, university, major, academic_year, sports_experience, 0, notes))
+                        st.success("تمت الإضافة بنجاح!")
+                    except Exception as e:
+                        st.error(f"❌ خطأ من قاعدة البيانات: تأكد من أسماء الأعمدة في Supabase. التفاصيل: {str(e)}")
                 else:
                     st.error("الاسم الإجباري!")
 
