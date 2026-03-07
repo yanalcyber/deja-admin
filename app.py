@@ -5,11 +5,11 @@ import sqlite3
 from supabase import create_client, Client
 
 # ==========================================
-# 1. إعدادات الصفحة والتصميم (العالمي)
+# 1. إعدادات الصفحة والتصميم
 # ==========================================
-st.set_page_config(page_title="Deja Admin Pro", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="Deja Admin Pro", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# تصميم CSS احترافي (خطوط، ألوان، وإخفاء أدوات Streamlit الافتراضية)
+# تصميم CSS احترافي (خطوط، ألوان، والبطاقات)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
@@ -26,14 +26,6 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         text-align: center;
         border-top: 4px solid #4CAF50;
-    }
-    .stButton>button {
-        border-radius: 8px;
-        font-weight: bold;
-        transition: 0.3s;
-    }
-    .stButton>button:hover {
-        transform: translateY(-2px);
     }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -86,7 +78,66 @@ TEAMS = ["غير محدد", "فريق ميديا", "فريق IT"]
 ROLES = ["عضو", "إداري"]
 
 # ==========================================
-# 3. واجهة الدخول 
+# 3. النافذة المنبثقة (البطاقة الكبيرة للتفاصيل والتعديل)
+# ==========================================
+@st.dialog("🪪 بطاقة العضو الشاملة")
+def member_details_dialog(member):
+    # عرض المعلومات الأساسية بشكل مرتب
+    st.markdown(f"<h3 style='text-align: center; color: #4CAF50;'>{member['name']}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: center;'>{member.get('english_name', '-')}</p>", unsafe_allow_html=True)
+    st.markdown("---")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.write(f"📞 **الهاتف:** {member['phone']}")
+        st.write(f"👥 **الفريق:** {member['team']}")
+        st.write(f"🎓 **الجامعة:** {member.get('university', '-')}")
+        st.write(f"📅 **السنة:** {member.get('academic_year', '-')}")
+    with c2:
+        st.write(f"📧 **الإيميل:** {member['email']}")
+        st.write(f"⭐ **الرتبة:** {member['role']}")
+        st.write(f"📚 **التخصص:** {member.get('major', '-')}")
+        st.write(f"🏠 **السكن:** {member.get('residence', '-')}")
+        
+    st.write(f"💯 **النقاط:** {member['points']}")
+    st.write(f"🏅 **الخبرة الرياضية:** {member.get('sports_experience', '-')}")
+    st.write(f"📝 **ملاحظات:** {member.get('notes', '-')}")
+    
+    st.markdown("---")
+    
+    # قسم التعديل داخل البطاقة
+    with st.expander("✏️ تعديل بيانات العضو"):
+        with st.form(key=f"edit_form_{member['id']}"):
+            e_name = st.text_input("الاسم", value=member['name'])
+            e_eng = st.text_input("الاسم بالإنجليزي", value=member.get('english_name', ''))
+            e_phone = st.text_input("رقم الهاتف", value=member['phone'])
+            e_email = st.text_input("الإيميل", value=member['email'])
+            
+            t_idx = TEAMS.index(member['team']) if member['team'] in TEAMS else 0
+            e_team = st.selectbox("الفريق", TEAMS, index=t_idx)
+            
+            r_idx = ROLES.index(member['role']) if member['role'] in ROLES else 0
+            e_role = st.selectbox("الرتبة", ROLES, index=r_idx)
+            
+            e_res = st.text_input("السكن", value=member.get('residence', ''))
+            e_uni = st.text_input("الجامعة", value=member.get('university', ''))
+            e_maj = st.text_input("التخصص", value=member.get('major', ''))
+            e_ay = st.text_input("السنة", value=member.get('academic_year', ''))
+            e_se = st.text_area("الخبرة", value=member.get('sports_experience', ''))
+            e_pts = st.number_input("النقاط", value=int(member['points']), step=1)
+            e_notes = st.text_area("ملاحظات", value=member.get('notes', ''))
+            
+            if st.form_submit_button("حفظ التحديثات ✅", use_container_width=True):
+                db.update_member(member['id'], (e_name, e_eng, e_phone, e_email, e_team, e_role, e_res, e_uni, e_maj, e_ay, e_se, e_pts, e_notes))
+                st.rerun()
+                
+    # زر الحذف في أسفل البطاقة
+    if st.button("حذف الحساب نهائياً ❌", type="secondary", use_container_width=True):
+        db.delete_member(member['id'])
+        st.rerun()
+
+# ==========================================
+# 4. واجهة الدخول 
 # ==========================================
 if st.session_state['user'] is None:
     st.markdown("<h1 style='text-align: center; color: #4CAF50;'>⚡ Deja Workspace</h1>", unsafe_allow_html=True)
@@ -127,18 +178,17 @@ if st.session_state['user'] is None:
                         st.error("❌ حدث خطأ، تأكد من البيانات.")
 
 # ==========================================
-# 4. لوحة الإدارة الاحترافية (بعد الدخول)
+# 5. لوحة الإدارة الاحترافية (بعد الدخول)
 # ==========================================
 else:
     user_name = st.session_state['user'].user_metadata.get('name', 'مدير النظام')
     members_data = db.get_all_members()
-    df = pd.DataFrame(members_data) if members_data else pd.DataFrame()
 
-    # القائمة الجانبية (Navigation)
+    # القائمة الجانبية القابلة للطي (Sidebar)
     with st.sidebar:
         st.markdown(f"### 👨‍💻 أهلاً، **{user_name}**")
         st.markdown("---")
-        menu = st.radio("القائمة الرئيسية:", ["📊 لوحة القيادة", "👥 إدارة الأعضاء", "➕ إضافة عضو جديد", "⚙️ أدوات النظام"])
+        menu = st.radio("القائمة الرئيسية:", ["👥 بطاقات الأعضاء", "📊 لوحة القيادة", "➕ إضافة عضو جديد", "⚙️ الإعدادات"])
         st.markdown("---")
         if st.button("تسجيل الخروج 🚪", use_container_width=True):
             supabase.auth.sign_out()
@@ -146,12 +196,53 @@ else:
             st.rerun()
 
     # ------------------------------------------
-    # الصفحة 1: لوحة القيادة (Dashboard)
+    # الصفحة 1: بطاقات الأعضاء (نظام البطاقات الجديد)
     # ------------------------------------------
-    if menu == "📊 لوحة القيادة":
+    if menu == "👥 بطاقات الأعضاء":
+        col_title, col_export = st.columns([3, 1])
+        with col_title:
+            st.title("📇 بطاقات فريق Deja")
+        with col_export:
+            if members_data:
+                df = pd.DataFrame(members_data)
+                csv = df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(label="📥 تصدير (Excel)", data=csv, file_name='deja_team.csv', mime='text/csv', use_container_width=True)
+
+        search_query = st.text_input("🔍 ابحث عن عضو بالاسم، الهاتف، أو السكن...", placeholder="اكتب للبحث...")
+        st.markdown("---")
+
+        if members_data:
+            # فلترة الأعضاء حسب البحث
+            filtered_members = []
+            for m in members_data:
+                search_text = f"{m['name']} {m['phone']} {m.get('residence','')} {m['team']}".lower()
+                if not search_query or search_query.lower() in search_text:
+                    filtered_members.append(m)
+
+            # ترتيب البطاقات في شبكة (Grid) كل سطر فيه 3 بطاقات
+            cols = st.columns(3)
+            for i, member in enumerate(filtered_members):
+                with cols[i % 3]: # توزيع البطاقات على الـ 3 أعمدة
+                    with st.container(border=True): # إنشاء إطار البطاقة
+                        st.markdown(f"#### 👤 {member['name']}")
+                        st.markdown(f"**الفريق:** {member['team']}")
+                        st.markdown(f"**🏠 السكن:** {member.get('residence', '-')}")
+                        st.markdown(f"**💯 النقاط:** {member['points']}")
+                        
+                        # زر المزيد اللي بيفتح الشاشة المنبثقة
+                        if st.button("المزيد ➕", key=f"more_{member['id']}", use_container_width=True):
+                            member_details_dialog(member)
+        else:
+            st.info("لا يوجد أعضاء في الفريق حتى الآن.")
+
+    # ------------------------------------------
+    # الصفحة 2: لوحة القيادة (Dashboard)
+    # ------------------------------------------
+    elif menu == "📊 لوحة القيادة":
         st.title("📊 الإحصائيات العامة")
         
-        if not df.empty:
+        if members_data:
+            df = pd.DataFrame(members_data)
             c1, c2, c3 = st.columns(3)
             with c1:
                 st.markdown(f"<div class='metric-card'><h3>👥 إجمالي الأعضاء</h3><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
@@ -164,82 +255,17 @@ else:
             
             st.write("---")
             col_chart, col_leader = st.columns([2, 1])
-            
             with col_chart:
                 st.subheader("📈 توزيع الأعضاء حسب الفرق")
                 team_counts = df['team'].value_counts()
                 st.bar_chart(team_counts)
-                
             with col_leader:
-                st.subheader("🔥 لوحة الشرف (أعلى 5)")
+                st.subheader("🔥 أعلى 5 نقاط")
                 top_5 = df.nlargest(5, 'points')[['name', 'points']]
                 for idx, row in top_5.iterrows():
                     st.success(f"**{row['name']}** - {row['points']} نقطة")
         else:
             st.info("لا يوجد بيانات لعرض الإحصائيات بعد.")
-
-    # ------------------------------------------
-    # الصفحة 2: إدارة الأعضاء
-    # ------------------------------------------
-    elif menu == "👥 إدارة الأعضاء":
-        col_title, col_export = st.columns([3, 1])
-        with col_title:
-            st.title("👥 إدارة فريق Deja")
-        with col_export:
-            if not df.empty:
-                csv = df.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(label="📥 تصدير البيانات (Excel/CSV)", data=csv, file_name='deja_team.csv', mime='text/csv', use_container_width=True)
-
-        search_query = st.text_input("🔍 ابحث بالاسم، رقم الهاتف، أو الإيميل...", placeholder="اكتب للبحث السريع...")
-        
-        # ترويسة الجدول الاحترافي
-        st.markdown("---")
-        header_cols = st.columns([3, 2, 3, 1])
-        header_cols[0].markdown("**👤 الاسم**")
-        header_cols[1].markdown("**📞 رقم الهاتف**")
-        header_cols[2].markdown("**📧 البريد الإلكتروني**")
-        header_cols[3].markdown("**⚙️ الإجراءات**")
-        st.markdown("---")
-
-        if not df.empty:
-            for _, member in df.iterrows():
-                if search_query:
-                    search_text = f"{member['name']} {member['phone']} {member['email']}".lower()
-                    if search_query.lower() not in search_text:
-                        continue
-
-                cols = st.columns([3, 2, 3, 1])
-                cols[0].write(f"**{member['name']}**")
-                cols[1].write(member['phone'] if member['phone'] else "-")
-                cols[2].write(member['email'] if member['email'] else "-")
-                
-                with cols[3]:
-                    with st.popover("⋮"):
-                        tab_info, tab_edit, tab_del = st.tabs(["🪪 التفاصيل", "✏️ تعديل", "🗑️ حذف"])
-                        
-                        with tab_info:
-                            st.write(f"**الجامعة:** {member.get('university', '-')} | **الفريق:** {member['team']}")
-                            st.write(f"**التخصص:** {member.get('major', '-')} | **السنة:** {member.get('academic_year', '-')}")
-                            st.write(f"**السكن:** {member.get('residence', '-')}")
-                            st.write(f"**النقاط:** {member['points']}")
-                            st.write(f"**الخبرة:** {member.get('sports_experience', '-')}")
-
-                        with tab_edit:
-                            with st.form(key=f"form_{member['id']}"):
-                                e_name = st.text_input("الاسم", value=member['name'])
-                                e_phone = st.text_input("رقم الهاتف", value=member['phone'])
-                                e_team = st.selectbox("الفريق", TEAMS, index=TEAMS.index(member['team']) if member['team'] in TEAMS else 0)
-                                e_points = st.number_input("النقاط", value=int(member['points']), step=1)
-                                
-                                if st.form_submit_button("حفظ التحديث ✅", use_container_width=True):
-                                    db.update_member(member['id'], (e_name, member.get('english_name',''), e_phone, member['email'], e_team, member['role'], member.get('residence',''), member.get('university',''), member.get('major',''), member.get('academic_year',''), member.get('sports_experience',''), e_points, member.get('notes','')))
-                                    st.rerun()
-
-                        with tab_del:
-                            if st.button("تأكيد الحذف ❌", key=f"del_{member['id']}", use_container_width=True, type="secondary"):
-                                db.delete_member(member['id'])
-                                st.rerun()
-                st.markdown("---")
 
     # ------------------------------------------
     # الصفحة 3: إضافة عضو جديد
@@ -272,16 +298,15 @@ else:
                     st.error("الاسم الإجباري!")
 
     # ------------------------------------------
-    # الصفحة 4: أدوات النظام (للمطورين)
+    # الصفحة 4: الإعدادات (الأدوات)
     # ------------------------------------------
-    elif menu == "⚙️ أدوات النظام":
-        st.title("⚙️ الصيانة والأدوات")
+    elif menu == "⚙️ الإعدادات":
+        st.title("⚙️ إعدادات النظام")
         st.info("هذا القسم مخصص للعمليات التقنية وسحب البيانات القديمة.")
         
         if os.path.exists("deja.db"):
             st.warning("⚠️ تم العثور على ملف `deja.db` القديم في الخوادم.")
-            if st.button("سحب الأسماء من الملف لقاعدة البيانات الحية 🚀", type="primary"):
-                # (نفس كود السحب القديم موجود هنا وتلقائي بيشتغل)
+            if st.button("تنزيل الأسماء من الملف 🚀", type="primary"):
                 try:
                     conn = sqlite3.connect(':memory:')
                     cursor = conn.cursor()
@@ -299,5 +324,6 @@ else:
                             db.add_member((n, str(d.get("الاسم_بالانجليزية", "")).strip(), str(d.get("رقم_الهاتف", "")), "", str(d.get("الفريق", "غير محدد")), "عضو", str(d.get("مكان_السكن", "")), str(d.get("الجامعة", "")), str(d.get("التخصص", "")), str(d.get("السنة_الدراسية", "")), str(d.get("الخبرة_الرياضية", "")), 0, ""))
                             count += 1
                     st.success(f"تم سحب {count} عضو!")
+                    st.rerun()
                 except Exception as e:
                     st.error(f"خطأ: {e}")
