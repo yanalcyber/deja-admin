@@ -27,24 +27,36 @@ class DatabaseManager:
     def add_member(self, data):
         row = {
             "name": data[0],
-            "phone": data[1],
-            "email": data[2],
-            "team": data[3],
-            "role": data[4],
-            "points": data[5],
-            "notes": data[6]
+            "english_name": data[1],
+            "phone": data[2],
+            "email": data[3],
+            "team": data[4],
+            "role": data[5],
+            "residence": data[6],
+            "university": data[7],
+            "major": data[8],
+            "academic_year": data[9],
+            "sports_experience": data[10],
+            "points": data[11],
+            "notes": data[12]
         }
         supabase.table("members").insert(row).execute()
 
     def update_member(self, member_id, data):
         row = {
             "name": data[0],
-            "phone": data[1],
-            "email": data[2],
-            "team": data[3],
-            "role": data[4],
-            "points": data[5],
-            "notes": data[6]
+            "english_name": data[1],
+            "phone": data[2],
+            "email": data[3],
+            "team": data[4],
+            "role": data[5],
+            "residence": data[6],
+            "university": data[7],
+            "major": data[8],
+            "academic_year": data[9],
+            "sports_experience": data[10],
+            "points": data[11],
+            "notes": data[12]
         }
         supabase.table("members").update(row).eq("id", member_id).execute()
 
@@ -131,20 +143,30 @@ else:
     with st.sidebar:
         st.header("➕ إضافة حساب جديد للمشروع")
         with st.form("add_member_form", clear_on_submit=True):
-            name = st.text_input("الاسم الثلاثي باللغة العربية *")
+            name = st.text_input("الاسم باللغة العربية *")
+            english_name = st.text_input("الاسم بالإنجليزية")
             phone = st.text_input("رقم الهاتف")
             email = st.text_input("البريد الإلكتروني")
+            
+            st.markdown("---")
             team = st.selectbox("الفريق", TEAMS)
             role = st.selectbox("الرتبة", ROLES)
             points = st.number_input("النقاط", min_value=0, value=0, step=1)
-            notes = st.text_area("ملاحظات")
+            
+            st.markdown("---")
+            residence = st.text_input("🏠 السكن")
+            university = st.text_input("🎓 الجامعة")
+            major = st.text_input("📚 التخصص")
+            academic_year = st.text_input("🎓 السنة الدراسية")
+            sports_experience = st.text_area("🏅 الخبرة الرياضية")
+            notes = st.text_area("📝 ملاحظات أخرى")
             
             submit_btn = st.form_submit_button("إضافة الحساب ✅", use_container_width=True)
             if submit_btn:
                 if not name.strip():
                     st.error("⚠️ الاسم مطلوب!")
                 else:
-                    db.add_member((name, phone, email, team, role, points, notes))
+                    db.add_member((name, english_name, phone, email, team, role, residence, university, major, academic_year, sports_experience, points, notes))
                     st.success(f"تمت إضافة {name} بنجاح!")
                     st.rerun()
 
@@ -172,18 +194,25 @@ else:
                         row_dict = dict(zip(column_names, row))
                         n = str(row_dict.get("الاسم_بالعربية", "")).strip()
                         if n and n != "None":
+                            eng_n = str(row_dict.get("الاسم_بالانجليزية", "")).strip()
                             p = str(row_dict.get("رقم_الهاتف", ""))
                             e = str(row_dict.get("البريد_الإلكتروني", ""))
                             t = str(row_dict.get("الفريق", "غير محدد"))
                             r = str(row_dict.get("الرتبة", "عضو"))
+                            res = str(row_dict.get("مكان_السكن", ""))
+                            uni = str(row_dict.get("الجامعة", ""))
+                            maj = str(row_dict.get("التخصص", ""))
+                            ay = str(row_dict.get("السنة_الدراسية", ""))
+                            se = str(row_dict.get("الخبرة_الرياضية", ""))
                             nts = str(row_dict.get("ملاحظات", ""))
+                            
                             if not t or t == "None": t = "غير محدد"
                             if not r or r == "None": r = "عضو"
-                            if p == "None": p = ""
-                            if e == "None": e = ""
-                            if nts == "None": nts = ""
+                            
+                            fields = [eng_n, p, e, res, uni, maj, ay, se, nts]
+                            fields = ["" if f == "None" else f for f in fields]
 
-                            db.add_member((n, p, e, t, r, 0, nts))
+                            db.add_member((n, fields[0], fields[1], fields[2], t, r, fields[3], fields[4], fields[5], fields[6], fields[7], 0, fields[8]))
                             added_count += 1
                 conn.close()
                 st.success(f"✅ تم إضافة {added_count} عضو بنجاح! جاري التحديث...")
@@ -191,15 +220,19 @@ else:
             except Exception as e:
                 st.error(f"❌ حدث خطأ: {e}")
 
-    # --- عرض الجدول ---
+    # --- عرض البيانات المختصرة ---
     members_data = db.get_all_members()
     st.write(f"**إجمالي الأعضاء المسجلين:** {len(members_data)}")
 
     if members_data:
         df = pd.DataFrame(members_data)
         df_display = df.rename(columns={
-            'id': 'الرقم', 'name': 'الاسم', 'phone': 'رقم الهاتف',
-            'email': 'البريد الإلكتروني', 'team': 'الفريق', 'role': 'الرتبة',
+            'id': 'الرقم', 'name': 'الاسم', 'english_name': 'الاسم بالانجليزية',
+            'phone': 'رقم الهاتف', 'email': 'البريد الإلكتروني',
+            'team': 'الفريق', 'role': 'الرتبة',
+            'residence': 'السكن', 'university': 'الجامعة',
+            'major': 'التخصص', 'academic_year': 'السنة الدراسية',
+            'sports_experience': 'الخبرة الرياضية',
             'points': 'النقاط', 'notes': 'ملاحظات'
         })
         
@@ -208,55 +241,87 @@ else:
             mask = df_display.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)
             df_display = df_display[mask]
 
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
+        # 1. الجدول المختصر والنظيف
+        st.dataframe(
+            df_display[['الرقم', 'الاسم', 'الفريق', 'الرتبة']], 
+            use_container_width=True, 
+            hide_index=True
+        )
+        
         st.markdown("---")
+        st.subheader("⚙️ لوحة إدارة الأعضاء التفصيلية")
         
-        # --- قسم التعديل والحذف الجديد ---
-        col_edit, col_delete = st.columns(2)
+        # 2. اللوحة السفلية (معلومات، تعديل، حذف)
+        tab_info, tab_edit, tab_del = st.tabs(["🪪 معلومات العضو", "✏️ تعديل البيانات", "🗑️ حذف حساب"])
         
-        # 1. التعديل
-        with col_edit:
-            st.subheader("✏️ تعديل بيانات عضو")
-            edit_options = [f"{row['name']} (رقم: {row['id']})" for _, row in df.iterrows()]
-            selected_to_edit = st.selectbox("اختر العضو المراد تعديله:", [""] + edit_options, key="edit_select")
-            
-            if selected_to_edit:
-                member_id = int(selected_to_edit.split("(رقم: ")[1].replace(")", ""))
-                # استخراج بيانات العضو الحالية من الداتا فريم
-                current_data = df[df['id'] == member_id].iloc[0]
+        member_options = [f"{row['الاسم']} (رقم: {row['الرقم']})" for _, row in df_display.iterrows()]
+        
+        # قسم عرض المعلومات
+        with tab_info:
+            selected_info = st.selectbox("🔍 اختر العضو لعرض كافة تفاصيله:", [""] + member_options, key="sel_info")
+            if selected_info:
+                member_id = int(selected_info.split("(رقم: ")[1].replace(")", ""))
+                row = df_display[df_display['الرقم'] == member_id].iloc[0]
+                
+                st.info(f"**الاسم:** {row['الاسم']} | **الاسم بالإنجليزي:** {row.get('الاسم بالانجليزية', '')}")
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.write(f"📞 **الهاتف:** {row['رقم الهاتف']}")
+                    st.write(f"📧 **الإيميل:** {row['البريد الإلكتروني']}")
+                    st.write(f"🏠 **السكن:** {row.get('السكن', '')}")
+                with c2:
+                    st.write(f"🎓 **الجامعة:** {row.get('الجامعة', '')}")
+                    st.write(f"📚 **التخصص:** {row.get('التخصص', '')}")
+                    st.write(f"📅 **السنة:** {row.get('السنة الدراسية', '')}")
+                with c3:
+                    st.write(f"👥 **الفريق:** {row['الفريق']}")
+                    st.write(f"⭐ **الرتبة:** {row['الرتبة']}")
+                    st.write(f"💯 **النقاط:** {row['النقاط']}")
+                
+                st.write(f"🏅 **الخبرة الرياضية:** {row.get('الخبرة الرياضية', '')}")
+                st.write(f"📝 **ملاحظات:** {row.get('ملاحظات', '')}")
+
+        # قسم التعديل
+        with tab_edit:
+            selected_edit = st.selectbox("✏️ اختر العضو لتعديل بياناته:", [""] + member_options, key="sel_edit")
+            if selected_edit:
+                member_id = int(selected_edit.split("(رقم: ")[1].replace(")", ""))
+                current_data = df_display[df_display['الرقم'] == member_id].iloc[0]
                 
                 with st.form("edit_form"):
-                    e_name = st.text_input("الاسم", value=current_data['name'])
-                    e_phone = st.text_input("رقم الهاتف", value=current_data['phone'])
-                    e_email = st.text_input("البريد الإلكتروني", value=current_data['email'])
-                    
-                    team_idx = TEAMS.index(current_data['team']) if current_data['team'] in TEAMS else 0
-                    e_team = st.selectbox("الفريق", TEAMS, index=team_idx)
-                    
-                    role_idx = ROLES.index(current_data['role']) if current_data['role'] in ROLES else 0
-                    e_role = st.selectbox("الرتبة", ROLES, index=role_idx)
-                    
-                    e_points = st.number_input("النقاط", value=int(current_data['points']), step=1)
-                    e_notes = st.text_area("ملاحظات", value=current_data['notes'])
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        e_name = st.text_input("الاسم", value=current_data['الاسم'])
+                        e_eng = st.text_input("الاسم بالإنجليزي", value=current_data.get('الاسم بالانجليزية', ''))
+                        e_phone = st.text_input("رقم الهاتف", value=current_data['رقم الهاتف'])
+                        e_email = st.text_input("البريد الإلكتروني", value=current_data['البريد الإلكتروني'])
+                        
+                        team_idx = TEAMS.index(current_data['الفريق']) if current_data['الفريق'] in TEAMS else 0
+                        e_team = st.selectbox("الفريق", TEAMS, index=team_idx)
+                        
+                        role_idx = ROLES.index(current_data['الرتبة']) if current_data['الرتبة'] in ROLES else 0
+                        e_role = st.selectbox("الرتبة", ROLES, index=role_idx)
+                        
+                        e_points = st.number_input("النقاط", value=int(current_data['النقاط']), step=1)
+                    with col2:
+                        e_res = st.text_input("السكن", value=current_data.get('السكن', ''))
+                        e_uni = st.text_input("الجامعة", value=current_data.get('الجامعة', ''))
+                        e_maj = st.text_input("التخصص", value=current_data.get('التخصص', ''))
+                        e_ay = st.text_input("السنة الدراسية", value=current_data.get('السنة الدراسية', ''))
+                        e_se = st.text_area("الخبرة الرياضية", value=current_data.get('الخبرة الرياضية', ''))
+                        e_notes = st.text_area("ملاحظات", value=current_data.get('ملاحظات', ''))
                     
                     if st.form_submit_button("حفظ التعديلات 💾", type="primary", use_container_width=True):
-                        if not e_name.strip():
-                            st.error("⚠️ الاسم مطلوب!")
-                        else:
-                            db.update_member(member_id, (e_name, e_phone, e_email, e_team, e_role, e_points, e_notes))
-                            st.success("✅ تم التعديل بنجاح!")
-                            st.rerun()
+                        db.update_member(member_id, (e_name, e_eng, e_phone, e_email, e_team, e_role, e_res, e_uni, e_maj, e_ay, e_se, e_points, e_notes))
+                        st.success("✅ تم التعديل بنجاح!")
+                        st.rerun()
 
-        # 2. الحذف
-        with col_delete:
-            st.subheader("🗑️ حذف حساب عضو")
-            delete_options = [f"{row['name']} (رقم: {row['id']})" for _, row in df.iterrows()]
-            selected_to_delete = st.selectbox("اختر العضو المراد حذفه:", [""] + delete_options, key="delete_select")
-            
-            st.write("") # مسافة للترتيب
-            if st.button("حذف الحساب نهائياً ❌", type="primary", use_container_width=True):
-                if selected_to_delete:
-                    del_member_id = int(selected_to_delete.split("(رقم: ")[1].replace(")", ""))
+        # قسم الحذف
+        with tab_del:
+            selected_del = st.selectbox("🗑️ اختر العضو للحذف:", [""] + member_options, key="sel_del")
+            if st.button("حذف الحساب نهائياً ❌", type="secondary", use_container_width=True):
+                if selected_del:
+                    del_member_id = int(selected_del.split("(رقم: ")[1].replace(")", ""))
                     db.delete_member(del_member_id)
                     st.success("تم حذف الحساب بنجاح!")
                     st.rerun()
