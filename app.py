@@ -207,8 +207,9 @@ else:
         st.markdown(f"### 👨‍💻 أهلاً، **{st.session_state['user'].user_metadata.get('name', 'المدير')}**")
         st.caption(f"الرتبة: {current_role}")
         
+        # إضافة الخانة الجديدة للإدارة فقط
         if is_admin:
-            menu_options = ["👥 بطاقات الأعضاء", "📋 بطاقات المهام", "➕ إضافة عضو يدوياً"]
+            menu_options = ["👥 بطاقات الأعضاء", "📋 بطاقات المهام", "➕ إضافة عضو يدوياً", "🔔 طلبات الانضمام"]
         else:
             menu_options = ["👥 بطاقات الأعضاء"]
             
@@ -217,6 +218,7 @@ else:
         if st.button("خروج 🚪", use_container_width=True):
             supabase.auth.sign_out(); st.session_state['user'] = None; st.rerun()
 
+    # --- 1. صفحة المهام ---
     if menu == "📋 بطاقات المهام":
         st.title("📋 إدارة مهام الفريق")
         with st.expander("➕ إنشاء مهمة جديدة"):
@@ -252,34 +254,20 @@ else:
                     with st.container(border=True):
                         st.write(f"**{t['name']}**")
 
+    # --- 2. صفحة الأعضاء (الآن تعرض المفعلين فقط) ---
     elif menu == "👥 بطاقات الأعضاء":
-        st.title("👥 فريق Deja")
+        st.title("👥 فريق Deja المفعلين")
         members = db.get_all_members()
         
         if members:
-            if is_admin:
-                new_accounts = [m for m in members if m.get('role') == 'غير محدد']
-                if new_accounts:
-                    st.warning(f"🔔 تنبيه: يوجد ({len(new_accounts)}) حسابات جديدة بانتظار تحديد الصلاحيات والتفعيل!")
-                    cols_new = st.columns(3)
-                    for i, m in enumerate(new_accounts):
-                        with cols_new[i % 3]:
-                            # تصليح الـ HTML باستخدام Double Quotes
-                            new_card = f'<div style="background-color:#4a1c1c; padding:15px; border-radius:10px; border: 2px solid #ff9800; margin-bottom:10px; text-align:right;"><h4 style="color:#ff9800; margin:0px;">🆕 {m["name"]}</h4><p style="color:#CCC; font-size:13px; margin:5px 0px;">📞 {m["phone"]}</p></div>'
-                            st.markdown(new_card, unsafe_allow_html=True)
-                            if st.button("⚙️ تفعيل الحساب", key=f"act_{m['id']}", use_container_width=True):
-                                member_details_dialog(m, is_admin)
-                    st.markdown("---")
-            
+            # استخراج الأعضاء المفعلين فقط
             active_members = [m for m in members if m.get('role') != 'غير محدد']
             if active_members:
-                if is_admin: st.subheader("👥 الأعضاء المفعلين")
                 cols = st.columns(3)
                 for i, m in enumerate(active_members):
                     with cols[i % 3]:
                         bg = "#0e2038" if m.get('gender') == "ذكر" else ("#361125" if m.get('gender') == "أنثى" else "#1E1E1E")
                         
-                        # تصليح الأوسمة والبطاقات (Double Quotes Only)
                         badges = f'<div style="background-color:#FFD700; color:black; padding:2px 8px; border-radius:10px; font-size:10px; position:absolute; left:10px; top:10px;">{m.get("role")}</div>' if m.get('role') not in ['عضو', 'غير محدد'] else ""
                         c_html = f'<div style="background-color:{bg}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:140px; margin-bottom:10px; text-align:right;">{badges}<h4 style="color:white; margin:0px;">👤 {m["name"]}</h4><p style="color:#CCC; font-size:13px; margin:10px 0px;">📍 {m.get("House location", "-")}</p><p style="color:#4CAF50; font-weight:bold;">💯 {m.get("points", 0)} نقطة</p></div>'
                         
@@ -287,7 +275,30 @@ else:
                         
                         if st.button("المزيد ➕", key=f"btn_{m['id']}", use_container_width=True):
                             member_details_dialog(m, is_admin)
+            else:
+                st.info("لا يوجد أعضاء مفعلين حتى الآن.")
 
+    # --- 3. الخانة الجديدة: طلبات الانضمام (للإدارة فقط) ---
+    elif menu == "🔔 طلبات الانضمام":
+        st.title("🔔 الحسابات بانتظار التفعيل")
+        members = db.get_all_members()
+        
+        if members:
+            new_accounts = [m for m in members if m.get('role') == 'غير محدد']
+            if new_accounts:
+                st.warning(f"يوجد ({len(new_accounts)}) حسابات جديدة بحاجة إلى تحديد رتبة.")
+                cols_new = st.columns(3)
+                for i, m in enumerate(new_accounts):
+                    with cols_new[i % 3]:
+                        new_card = f'<div style="background-color:#4a1c1c; padding:15px; border-radius:10px; border: 2px solid #ff9800; margin-bottom:10px; text-align:right;"><h4 style="color:#ff9800; margin:0px;">🆕 {m["name"]}</h4><p style="color:#CCC; font-size:13px; margin:5px 0px;">📞 {m["phone"]}</p></div>'
+                        st.markdown(new_card, unsafe_allow_html=True)
+                        # زر تفعيل الحساب
+                        if st.button("⚙️ ترقية وتفعيل", key=f"act_{m['id']}", use_container_width=True):
+                            member_details_dialog(m, is_admin)
+            else:
+                st.success("🎉 لا يوجد طلبات انضمام جديدة. جميع الأعضاء تم تفعيلهم!")
+
+    # --- 4. إضافة يدوية ---
     elif menu == "➕ إضافة عضو يدوياً":
         st.title("➕ تسجيل عضو يدوياً")
         with st.form("a_form"):
@@ -301,4 +312,3 @@ else:
                 if n:
                     db.add_member((n, p, ", ".join(ts), r, res, g, "", ""))
                     st.success("تم!"); st.rerun()
-
