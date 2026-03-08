@@ -9,15 +9,15 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Deja Workspace Pro", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Tajawal', sans-serif !important; }
-    .stMarkdown, .stText, h1, h2, h3, h4, h5, h6, p, label, .stTextInput, .stSelectbox, .stTextArea, .stRadio, .stMultiSelect {
-        direction: rtl !important; text-align: right !important;
-    }
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    </style>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+html, body, [class*="css"] { font-family: 'Tajawal', sans-serif !important; }
+.stMarkdown, .stText, h1, h2, h3, h4, h5, h6, p, label, .stTextInput, .stSelectbox, .stTextArea, .stRadio, .stMultiSelect {
+    direction: rtl !important; text-align: right !important;
+}
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+</style>
 """, unsafe_allow_html=True)
 
 # ==========================================
@@ -106,7 +106,6 @@ def member_details_dialog(member, is_admin):
                 current_teams = [t.strip() for t in member.get('team', '').split(",")] if member.get('team') else []
                 e_teams = st.multiselect("الفرق", TEAMS, default=[t for t in current_teams if t in TEAMS])
                 
-                # إظهار الرتب عشان الإدارة تغير من "غير محدد" إلى رتبة حقيقية
                 e_role = st.selectbox("الرتبة", ROLES, index=ROLES.index(member['role']) if member['role'] in ROLES else 3)
                 e_gender = st.selectbox("الجنس", GENDERS, index=GENDERS.index(member.get('gender', 'غير محدد')) if member.get('gender', 'غير محدد') in GENDERS else 0)
                 
@@ -144,6 +143,11 @@ if st.session_state['user'] is None:
                     clean_p = l_phone.strip()
                     res = supabase.auth.sign_in_with_password({"email": f"{clean_p}@deja.com", "password": l_pass})
                     st.session_state['user'] = res.user
+                    
+                    existing_member = db.get_member_by_phone(clean_p)
+                    if not existing_member:
+                        u_name = res.user.user_metadata.get('name', 'عضو جديد')
+                        db.add_member((u_name, clean_p, "غير محدد", "غير محدد", "", "غير محدد", "", ""))
                     st.rerun()
                 except: st.error("❌ خطأ في البيانات")
         with tab2:
@@ -154,10 +158,8 @@ if st.session_state['user'] is None:
                 if s_name and s_phone and s_pass:
                     try:
                         clean_p = s_phone.strip()
-                        # إنشاء يوزر في Supabase
                         supabase.auth.sign_up({"email": f"{clean_p}@deja.com", "password": s_pass, "options": {"data": {"name": s_name}}})
                         
-                        # السر هون: إضافة العضو فوراً لقاعدة البيانات برتبة "غير محدد"
                         if not db.get_member_by_phone(clean_p):
                             db.add_member((s_name, clean_p, "غير محدد", "غير محدد", "", "غير محدد", "", ""))
                             
@@ -225,13 +227,12 @@ else:
                     with st.container(border=True):
                         st.write(f"**{t['name']}**")
 
-    # --- صفحة الأعضاء (نظام التفعيل للإدارة) ---
+    # --- صفحة الأعضاء ---
     elif menu == "👥 بطاقات الأعضاء":
         st.title("👥 فريق Deja")
         members = db.get_all_members()
         
         if members:
-            # 1. نظام تنبيهات الحسابات الجديدة (فقط للإدارة)
             if is_admin:
                 new_accounts = [m for m in members if m.get('role') == 'غير محدد']
                 if new_accounts:
@@ -239,18 +240,13 @@ else:
                     cols_new = st.columns(3)
                     for i, m in enumerate(new_accounts):
                         with cols_new[i % 3]:
-                            # بطاقة مميزة باللون الأحمر/البرتقالي للحسابات الجديدة
-                            st.markdown(f"""
-                            <div style='background-color:#4a1c1c; padding:15px; border-radius:10px; border: 2px solid #ff9800; margin-bottom:10px; text-align:right;'>
-                                <h4 style='color:#ff9800; margin:0;'>🆕 {m['name']}</h4>
-                                <p style='color:#CCC; font-size:13px; margin:5px 0;'>📞 {m['phone']}</p>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            # السر هون: HTML مسطح تماماً بدون فراغات
+                            new_card = f"<div style='background-color:#4a1c1c; padding:15px; border-radius:10px; border: 2px solid #ff9800; margin-bottom:10px; text-align:right;'><h4 style='color:#ff9800; margin:0;'>🆕 {m['name']}</h4><p style='color:#CCC; font-size:13px; margin:5px 0;'>📞 {m['phone']}</p></div>"
+                            st.markdown(new_card, unsafe_allow_html=True)
                             if st.button("⚙️ تفعيل الحساب", key=f"act_{m['id']}", use_container_width=True):
                                 member_details_dialog(m, is_admin)
                     st.markdown("---")
             
-            # 2. عرض الأعضاء المفعلين فقط
             active_members = [m for m in members if m.get('role') != 'غير محدد']
             if active_members:
                 if is_admin: st.subheader("👥 الأعضاء المفعلين")
@@ -260,14 +256,8 @@ else:
                         bg = "#0e2038" if m.get('gender') == "ذكر" else ("#361125" if m.get('gender') == "أنثى" else "#1E1E1E")
                         badges = f"<div style='background-color:#FFD700; color:black; padding:2px 8px; border-radius:10px; font-size:10px; position:absolute; left:10px; top:10px;'>{m.get('role')}</div>" if m.get('role') not in ['عضو', 'غير محدد'] else ""
                         
-                        c_html = f"""
-                        <div style='background-color:{bg}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:140px; margin-bottom:10px; text-align:right;'>
-                            {badges}
-                            <h4 style='color:white; margin:0;'>👤 {m['name']}</h4>
-                            <p style='color:#CCC; font-size:13px; margin:10px 0;'>📍 {m.get('House location', '-')}</p>
-                            <p style='color:#4CAF50; font-weight:bold;'>💯 {m.get('points', 0)} نقطة</p>
-                        </div>
-                        """
+                        # السر هون كمان: HTML مسطح بالكامل لحل مشكلة التداخل
+                        c_html = f"<div style='background-color:{bg}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:140px; margin-bottom:10px; text-align:right;'>{badges}<h4 style='color:white; margin:0;'>👤 {m['name']}</h4><p style='color:#CCC; font-size:13px; margin:10px 0;'>📍 {m.get('House location', '-')}</p><p style='color:#4CAF50; font-weight:bold;'>💯 {m.get('points', 0)} نقطة</p></div>"
                         st.markdown(c_html, unsafe_allow_html=True)
                         
                         if st.button("المزيد ➕", key=f"btn_{m['id']}", use_container_width=True):
