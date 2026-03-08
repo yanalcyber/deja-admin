@@ -253,7 +253,7 @@ else:
                 for t in [x for x in tasks if x['status'] == "تم الإنجاز"]:
                     with st.container(border=True):
                         st.write(f"**{t['name']}**")
-    # --- 2. صفحة الأعضاء (مع محرك البحث والفلاتر) ---
+# --- 2. صفحة الأعضاء (مع محرك البحث والفلاتر الشاملة) ---
     elif menu == "👥 بطاقات الأعضاء":
         st.title("👥 فريق Deja المفعلين")
         members = db.get_all_members()
@@ -267,13 +267,16 @@ else:
                 # 🔍 صندوق البحث والفلاتر الذكي
                 # ---------------------------------------------
                 with st.expander("🔍 أدوات البحث والفلترة", expanded=True):
-                    f_col1, f_col2, f_col3 = st.columns(3)
+                    # قسمناهم لـ 4 أعمدة عشان نضيف فلتر الجنس
+                    f_col1, f_col2, f_col3, f_col4 = st.columns(4)
                     with f_col1:
                         search_name = st.text_input("البحث بالاسم 🔎")
                     with f_col2:
-                        filter_team = st.selectbox("تصفية حسب الفريق 👥", ["الكل"] + TEAMS)
+                        filter_team = st.selectbox("الفريق 👥", ["الكل"] + TEAMS)
                     with f_col3:
-                        filter_role = st.selectbox("تصفية حسب الرتبة ⭐", ["الكل"] + [r for r in ROLES if r != 'غير محدد'])
+                        filter_role = st.selectbox("الرتبة ⭐", ["الكل"] + [r for r in ROLES if r != 'غير محدد'])
+                    with f_col4:
+                        filter_gender = st.selectbox("الجنس 🚻", ["الكل"] + GENDERS)
                 
                 # تطبيق الفلاتر برمجياً
                 filtered_members = active_members
@@ -284,6 +287,8 @@ else:
                     filtered_members = [m for m in filtered_members if m.get('team') and filter_team in m['team']]
                 if filter_role != "الكل":
                     filtered_members = [m for m in filtered_members if m.get('role') == filter_role]
+                if filter_gender != "الكل":
+                    filtered_members = [m for m in filtered_members if m.get('gender') == filter_gender]
 
                 st.markdown("---")
                 
@@ -341,4 +346,5 @@ else:
                 if n:
                     db.add_member((n, p, ", ".join(ts), r, res, g, "", ""))
                     st.success("تم!"); st.rerun()
+
 
