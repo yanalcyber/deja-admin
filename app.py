@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
 import os
-import sqlite3
 from supabase import create_client, Client
 
 # ==========================================
 # 1. إعدادات الصفحة والتصميم
 # ==========================================
-st.set_page_config(page_title="Deja Admin Pro", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Deja Workspace Pro", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
@@ -16,11 +15,11 @@ st.markdown("""
     .stMarkdown, .stText, h1, h2, h3, h4, h5, h6, p, label, .stTextInput, .stSelectbox, .stTextArea, .stRadio, .stMultiSelect {
         direction: rtl !important; text-align: right !important;
     }
-    .metric-card {
-        background-color: #1E1E1E; border-radius: 10px; padding: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;
-        border-top: 4px solid #4CAF50; direction: rtl;
+    .task-card {
+        background-color: #1E1E1E; border-radius: 12px; padding: 15px;
+        border-right: 8px solid #4CAF50; margin-bottom: 15px; transition: 0.3s;
     }
+    .task-card:hover { transform: scale(1.02); }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
@@ -41,175 +40,136 @@ if 'user' not in st.session_state:
     st.session_state['user'] = None
 
 class DatabaseManager:
+    # --- وظائف الأعضاء ---
+    def get_all_members(self):
+        res = supabase.table("members").select("*").order("id", desc=True).execute()
+        return res.data
+    
     def add_member(self, data):
-        row = {
-            "name": data[0], "english_name": data[1], "phone": data[2], "email": data[3],
-            "team": data[4], "role": data[5], "residence": data[6], "university": data[7],
-            "major": data[8], "academic_year": data[9], "sports_experience": data[10],
-            "points": data[11], "notes": data[12], "gender": data[13]
-        }
+        row = {"name": data[0], "phone": data[2], "team": data[4], "role": data[5], "residence": data[6], "points": data[11], "gender": data[13]}
         supabase.table("members").insert(row).execute()
 
-    def update_member(self, member_id, data):
-        row = {
-            "name": data[0], "english_name": data[1], "phone": data[2], "email": data[3],
-            "team": data[4], "role": data[5], "residence": data[6], "university": data[7],
-            "major": data[8], "academic_year": data[9], "sports_experience": data[10],
-            "points": data[11], "notes": data[12], "gender": data[13]
-        }
-        supabase.table("members").update(row).eq("id", member_id).execute()
+    # --- وظائف المهام (الجديدة) ---
+    def add_task(self, data):
+        row = {"name": data[0], "summary": data[1], "level": data[2], "assignees": data[3], "status": "قيد الانتظار"}
+        supabase.table("tasks").insert(row).execute()
 
-    def delete_member(self, member_id):
-        supabase.table("members").delete().eq("id", member_id).execute()
+    def get_all_tasks(self):
+        res = supabase.table("tasks").select("*").order("id", desc=True).execute()
+        return res.data
 
-    def get_all_members(self):
-        response = supabase.table("members").select("*").order("id", desc=True).execute()
-        return response.data
+    def update_task_status(self, task_id, new_status):
+        supabase.table("tasks").update({"status": new_status}).eq("id", task_id).execute()
 
 db = DatabaseManager()
 
-TEAMS = ["فريق الإدارة", "فريق الميديا", "فريق IT", "فريق التنظيم", "فريق اللوجستك"]
-ROLES = ["عضو", "إداري", "قائد فريق"]
-GENDERS = ["غير محدد", "ذكر", "أنثى"]
+TEAMS_LIST = ["فريق الإدارة", "فريق الميديا", "فريق IT", "فريق التنظيم", "فريق اللوجستك"]
+TASK_LEVELS = ["🟢 منخفض", "🟡 متوسط", "🔴 مرتفع"]
 
 # ==========================================
-# 3. النافذة المنبثقة (البطاقة الكبيرة)
-# ==========================================
-@st.dialog("🪪 بطاقة العضو الشاملة")
-def member_details_dialog(member):
-    st.markdown(f"<h3 style='text-align: center; color: #4CAF50;'>{member['name']}</h3>", unsafe_allow_html=True)
-    st.markdown("---")
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        st.write(f"📞 **الهاتف:** {member['phone']}")
-        st.write(f"👥 **الفرق:** {member['team']}")
-        st.write(f"🎓 **الجامعة:** {member.get('university', '-')}")
-    with c2:
-        st.write(f"⭐ **الرتبة:** {member['role']}")
-        st.write(f"📚 **التخصص:** {member.get('major', '-')}")
-        st.write(f"🏠 **السكن:** {member.get('residence', '-')}")
-        
-    st.write(f"💯 **النقاط:** {member['points']}")
-    st.write(f"📝 **ملاحظات:** {member.get('notes', '-')}")
-    
-    st.markdown("---")
-    
-    with st.expander("✏️ تعديل بيانات العضو"):
-        with st.form(key=f"edit_form_{member['id']}"):
-            e_name = st.text_input("الاسم", value=member['name'])
-            
-            # تحويل النص المخزن في القاعدة لقائمة عشان الملتيسيلكت يفهمها
-            current_teams = [t.strip() for t in member['team'].split(",")] if member['team'] else []
-            e_teams = st.multiselect("الفرق (يمكنك اختيار أكثر من فريق)", TEAMS, default=[t for t in current_teams if t in TEAMS])
-            
-            e_role = st.selectbox("الرتبة", ROLES, index=ROLES.index(member['role']) if member['role'] in ROLES else 0)
-            e_gender = st.selectbox("الجنس", GENDERS, index=GENDERS.index(member.get('gender', 'غير محدد')) if member.get('gender', 'غير محدد') in GENDERS else 0)
-            
-            c1, c2 = st.columns(2)
-            with c1:
-                e_phone = st.text_input("رقم الهاتف", value=member['phone'])
-                e_res = st.text_input("السكن", value=member.get('residence', ''))
-            with c2:
-                e_pts = st.number_input("النقاط", value=int(member['points']), step=1)
-                e_uni = st.text_input("الجامعة", value=member.get('university', ''))
-            
-            e_notes = st.text_area("ملاحظات", value=member.get('notes', ''))
-            
-            if st.form_submit_button("حفظ التحديثات ✅", use_container_width=True):
-                # دمج الفرق في نص واحد مفصول بفاصلة للتخزين
-                teams_str = ", ".join(e_teams)
-                db.update_member(member['id'], (e_name, member.get('english_name',''), e_phone, member.get('email',''), teams_str, e_role, e_res, e_uni, member.get('major',''), member.get('academic_year',''), member.get('sports_experience',''), e_pts, e_notes, e_gender))
-                st.success("تم الحفظ!")
-                st.rerun()
-
-    if st.button("حذف الحساب نهائياً ❌", type="secondary", use_container_width=True):
-        db.delete_member(member['id'])
-        st.rerun()
-
-# ==========================================
-# 4. واجهة الدخول 
+# 3. واجهة الدخول
 # ==========================================
 if st.session_state['user'] is None:
     st.markdown("<h1 style='text-align: center; color: #4CAF50;'>⚡ Deja Workspace</h1>", unsafe_allow_html=True)
-    st.write("---")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        tab1, tab2 = st.tabs(["تسجيل الدخول", "إنشاء حساب"])
-        with tab1:
-            l_phone = st.text_input("رقم الهاتف")
-            l_pass = st.text_input("كلمة المرور", type="password")
-            if st.button("دخول 🚀", use_container_width=True, type="primary"):
-                try:
-                    res = supabase.auth.sign_in_with_password({"email": f"{l_phone.strip()}@deja.com", "password": l_pass})
-                    st.session_state['user'] = res.user
-                    st.rerun()
-                except Exception as e: st.error("خطأ في البيانات")
-        with tab2:
-            s_name = st.text_input("الاسم")
-            s_phone = st.text_input("رقم الهاتف للتسجيل")
-            s_pass = st.text_input("كلمة المرور (6 خانات)", type="password")
-            if st.button("إنشاء ✍️", use_container_width=True):
-                try:
-                    supabase.auth.sign_up({"email": f"{s_phone.strip()}@deja.com", "password": s_pass, "options": {"data": {"name": s_name}}})
-                    st.success("تم! سجل دخول الآن")
-                except: st.error("خطأ")
+        l_phone = st.text_input("رقم الهاتف")
+        l_pass = st.text_input("كلمة المرور", type="password")
+        if st.button("دخول 🚀", use_container_width=True, type="primary"):
+            try:
+                res = supabase.auth.sign_in_with_password({"email": f"{l_phone.strip()}@deja.com", "password": l_pass})
+                st.session_state['user'] = res.user
+                st.rerun()
+            except: st.error("خطأ في البيانات")
 
 # ==========================================
-# 5. لوحة الإدارة (بعد الدخول)
+# 4. لوحة التحكم
 # ==========================================
 else:
-    members_data = db.get_all_members()
-
     with st.sidebar:
         st.markdown(f"### 👨‍💻 أهلاً، **{st.session_state['user'].user_metadata.get('name', 'المدير')}**")
-        menu = st.radio("القائمة:", ["👥 بطاقات الأعضاء", "📊 لوحة القيادة", "➕ إضافة عضو جديد"])
+        menu = st.radio("القائمة الرئيسية:", ["📋 بطاقات المهام", "👥 بطاقات الأعضاء", "➕ إضافة عضو جديد"])
         st.markdown("---")
-        st.markdown("### 🏷️ تصفية الفريق")
-        f_team = st.selectbox("عرض فريق:", ["الكل"] + TEAMS)
         if st.button("خروج 🚪", use_container_width=True):
             supabase.auth.sign_out(); st.session_state['user'] = None; st.rerun()
 
-    if menu == "👥 بطاقات الأعضاء":
-        st.title(f"📇 {f_team if f_team != 'الكل' else 'أعضاء فريق Deja'}")
-        search = st.text_input("🔍 بحث بالاسم...")
+    # --- صفحة بطاقات المهام ---
+    if menu == "📋 بطاقات المهام":
+        st.title("📋 إدارة المهام والمشاريع")
+        
+        # زر الإضافة (Modal)
+        if st.button("➕ إنشاء مهمة جديدة", type="primary"):
+            st.session_state.show_task_form = True
+
+        if st.session_state.get('show_task_form'):
+            with st.expander("📝 تفاصيل المهمة الجديدة", expanded=True):
+                with st.form("task_form"):
+                    t_name = st.text_input("اسم المهمة *")
+                    t_summary = st.text_area("ملخص المهمة")
+                    t_level = st.select_slider("مستوى الأهمية", options=TASK_LEVELS)
+                    
+                    # اختيار المسؤولين (أعضاء + فرق)
+                    all_m = [m['name'] for m in db.get_all_members()]
+                    t_assignees = st.multiselect("مين المسؤول؟", options=TEAMS_LIST + all_m)
+                    
+                    if st.form_submit_button("إرسال المهمة 🚀"):
+                        if t_name:
+                            db.add_task((t_name, t_summary, t_level, ", ".join(t_assignees)))
+                            st.success("تمت إضافة المهمة!")
+                            st.session_state.show_task_form = False
+                            st.rerun()
+
         st.markdown("---")
-
-        if members_data:
-            filtered = [m for m in members_data if (f_team == "الكل" or f_team in m['team']) and (not search or search.lower() in m['name'].lower())]
+        tasks = db.get_all_tasks()
+        
+        if tasks:
+            # تقسيم المهام حسب الحالة
+            t_col1, t_col2, t_col3 = st.columns(3)
             
-            cols = st.columns(3)
-            for i, m in enumerate(filtered):
-                with cols[i % 3]:
-                    # 1. تحديد لون البطاقة حسب الجنس
-                    bg = "#0e2038" if m.get('gender') == "ذكر" else ("#361125" if m.get('gender') == "أنثى" else "#1E1E1E")
-                    
-                    # 2. بناء الأوسمة (Badges) بناءً على الرتبة وكل الفرق المختارة
-                    b_html = ""
-                    if m['role'] in ['إداري', 'قائد فريق']:
-                        b_html += f"<div style='background-color:#FFD700; color:#000; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:bold;'>{m['role']}</div>"
-                    
-                    m_teams = [t.strip() for t in m['team'].split(",")] if m['team'] else []
-                    for t in m_teams:
-                        color = "#E53935" if "ميديا" in t else ("#4CAF50" if "IT" in t else ("#00BCD4" if "إدارة" in t else "#9C27B0"))
-                        b_html += f"<div style='background-color:{color}; color:#FFF; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:bold;'>{t}</div>"
-                    
-                    # 3. رسم البطاقة
-                    c_html = f"<div style='background-color:{bg}; padding:15px; border-radius:12px; border: 1px solid #444; position:relative; min-height:180px; margin-bottom:10px; direction:rtl; text-align:right;'><div style='position:absolute; top:10px; left:10px; display:flex; flex-direction:column; gap:5px;'>{b_html}</div><h4 style='color:#FFF;'>👤 {m['name']}</h4><p style='font-size:13px; color:#CCC;'>📍 {m.get('residence', '-')}</p><p style='font-size:13px; color:#4CAF50;'>💯 {m['points']} نقطة</p></div>"
-                    st.markdown(c_html, unsafe_allow_html=True)
-                    if st.button("المزيد ➕", key=f"btn_{m['id']}", use_container_width=True):
-                        member_details_dialog(m)
+            with t_col1:
+                st.subheader("⏳ قيد الانتظار")
+                for t in [x for x in tasks if x['status'] == "قيد الانتظار"]:
+                    with st.container(border=True):
+                        st.markdown(f"### {t['name']}")
+                        st.caption(f"📍 المسؤول: {t['assignees']}")
+                        st.write(t['summary'])
+                        st.info(f"المستوى: {t['level']}")
+                        if st.button("بدء العمل ▶️", key=f"start_{t['id']}"):
+                            db.update_task_status(t['id'], "جاري العمل")
+                            st.rerun()
 
-    elif menu == "➕ إضافة عضو جديد":
-        st.title("➕ تسجيل عضو")
-        with st.form("a_form", clear_on_submit=True):
-            n = st.text_input("الاسم *")
-            g = st.selectbox("الجنس", GENDERS)
-            ts = st.multiselect("الفرق", TEAMS)
-            r = st.selectbox("الرتبة", ROLES)
-            p = st.text_input("الهاتف")
-            res = st.text_input("السكن")
-            if st.form_submit_button("إضافة 🚀", use_container_width=True):
-                if n:
-                    db.add_member((n, "", p, "", ", ".join(ts), r, res, "", "", "", "", 0, "", g))
-                    st.success("تمت الإضافة!")
+            with t_col2:
+                st.subheader("⚙️ جاري العمل")
+                for t in [x for x in tasks if x['status'] == "جاري العمل"]:
+                    with st.container(border=True):
+                        st.markdown(f"### {t['name']}")
+                        st.caption(f"📍 المسؤول: {t['assignees']}")
+                        st.write(t['summary'])
+                        st.warning(f"المستوى: {t['level']}")
+                        if st.button("تم الإنجاز ✅", key=f"done_{t['id']}"):
+                            db.update_task_status(t['id'], "تم الإنجاز")
+                            st.rerun()
+
+            with t_col3:
+                st.subheader("✅ تم الإنجاز")
+                for t in [x for x in tasks if x['status'] == "تم الإنجاز"]:
+                    with st.container(border=True):
+                        st.markdown(f"### {t['name']}")
+                        st.caption(f"📍 المسؤول: {t['assignees']}")
+                        st.success(f"المستوى: {t['level']}")
+                        st.write("عاش يا أبطال! 💪")
+        else:
+            st.info("لا يوجد مهام حالية. ابدأ بإضافة أول مهمة!")
+
+    # --- باقي الصفحات (الأعضاء) ---
+    elif menu == "👥 بطاقات الأعضاء":
+        st.title("👥 أعضاء فريق Deja")
+        m_data = db.get_all_members()
+        if m_data:
+            cols = st.columns(3)
+            for i, m in enumerate(m_data):
+                with cols[i % 3]:
+                    bg = "#0e2038" if m.get('gender') == "ذكر" else "#1E1E1E"
+                    c_html = f"<div style='background-color:{bg}; padding:15px; border-radius:12px; border: 1px solid #444; direction:rtl; text-align:right;'><h4 style='color:#FFF; margin-top:0;'>👤 {m['name']}</h4><p style='font-size:13px; color:#4CAF50; font-weight:bold;'>💯 {m['points']} نقطة</p></div>"
+                    st.markdown(c_html, unsafe_allow_html=True)
+                    st.write("")
