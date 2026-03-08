@@ -39,7 +39,6 @@ class DatabaseManager:
         res = supabase.table("members").select("*").order("id", desc=True).execute()
         return res.data
     
-    # دالة جديدة للبحث عن العضو برقم الهاتف عشان الصلاحيات
     def get_member_by_phone(self, phone):
         res = supabase.table("members").select("*").eq("phone", phone).execute()
         return res.data
@@ -82,9 +81,9 @@ TASK_LEVELS = ["🟢 منخفض", "🟡 متوسط", "🔴 مرتفع"]
 GENDERS = ["غير محدد", "ذكر", "أنثى"]
 
 # ==========================================
-# 3. النافذة المنبثقة للبطاقة (مربوطة بالصلاحيات)
+# 3. نافذة تفاصيل وتفعيل الأعضاء
 # ==========================================
-@st.dialog("🪪 بطاقة العضو الشاملة")
+@st.dialog("🪪 إدارة بيانات العضو")
 def member_details_dialog(member, is_admin):
     st.markdown(f"<h3 style='text-align: center; color: #4CAF50;'>{member['name']}</h3>", unsafe_allow_html=True)
     st.markdown("---")
@@ -100,13 +99,14 @@ def member_details_dialog(member, is_admin):
     st.write(f"💯 **النقاط:** {member.get('points', 0)}")
     st.markdown("---")
     
-    # 🔒 إذا كان إداري فقط، بيقدر يشوف فورم التعديل والحذف
     if is_admin:
-        with st.expander("✏️ إعدادات الإدارة (تعديل بيانات العضو)"):
+        with st.expander("✏️ تفعيل وتعديل الصلاحيات (للإدارة فقط)", expanded=True):
             with st.form(key=f"edit_form_{member['id']}"):
                 e_name = st.text_input("الاسم", value=member['name'])
                 current_teams = [t.strip() for t in member.get('team', '').split(",")] if member.get('team') else []
                 e_teams = st.multiselect("الفرق", TEAMS, default=[t for t in current_teams if t in TEAMS])
+                
+                # إظهار الرتب عشان الإدارة تغير من "غير محدد" إلى رتبة حقيقية
                 e_role = st.selectbox("الرتبة", ROLES, index=ROLES.index(member['role']) if member['role'] in ROLES else 3)
                 e_gender = st.selectbox("الجنس", GENDERS, index=GENDERS.index(member.get('gender', 'غير محدد')) if member.get('gender', 'غير محدد') in GENDERS else 0)
                 
@@ -119,9 +119,9 @@ def member_details_dialog(member, is_admin):
                 e_res = st.text_input("السكن", value=member.get('House location', ''))
                 e_year = st.text_input("التخصص/السنة", value=member.get('academic_year', ''))
                 
-                if st.form_submit_button("حفظ التحديثات ✅", use_container_width=True):
+                if st.form_submit_button("حفظ وتفعيل ✅", use_container_width=True):
                     db.update_member(member['id'], (e_name, e_phone, ", ".join(e_teams), e_role, e_res, e_pts, e_gender, e_year))
-                    st.success("تم الحفظ!")
+                    st.success("تم التفعيل والحفظ بنجاح!")
                     st.rerun()
 
         if st.button("حذف الحساب نهائياً ❌", type="secondary", use_container_width=True):
@@ -129,7 +129,7 @@ def member_details_dialog(member, is_admin):
             st.rerun()
 
 # ==========================================
-# 4. واجهة الدخول وإنشاء الحساب الذكي
+# 4. واجهة الدخول وإنشاء الحساب
 # ==========================================
 if st.session_state['user'] is None:
     st.markdown("<h1 style='text-align: center; color: #4CAF50;'>⚡ Deja Workspace</h1>", unsafe_allow_html=True)
@@ -144,30 +144,32 @@ if st.session_state['user'] is None:
                     clean_p = l_phone.strip()
                     res = supabase.auth.sign_in_with_password({"email": f"{clean_p}@deja.com", "password": l_pass})
                     st.session_state['user'] = res.user
-                    
-                    # 🔍 فحص سحري: هل العضو موجود بالجدول؟ إذا لأ، ضيفه تلقائياً كـ "غير محدد"
-                    existing_member = db.get_member_by_phone(clean_p)
-                    if not existing_member:
-                        u_name = res.user.user_metadata.get('name', 'عضو جديد')
-                        # إضافة: (الاسم، الهاتف، الفريق، الرتبة، السكن، الجنس، التخصص، الجامعة)
-                        db.add_member((u_name, clean_p, "غير محدد", "غير محدد", "", "غير محدد", "", ""))
                     st.rerun()
                 except: st.error("❌ خطأ في البيانات")
         with tab2:
             s_name = st.text_input("الاسم الكامل", key="reg_name")
             s_phone = st.text_input("رقم الهاتف", key="reg_phone")
             s_pass = st.text_input("كلمة المرور", type="password", key="reg_pass")
-            if st.button("إنشاء ✍️", use_container_width=True):
-                try:
-                    supabase.auth.sign_up({"email": f"{s_phone.strip()}@deja.com", "password": s_pass, "options": {"data": {"name": s_name}}})
-                    st.success("✅ تم! سجل دخول الآن من الخانة المجاورة.")
-                except: st.error("❌ حدث خطأ.")
+            if st.button("إنشاء حساب ✍️", use_container_width=True):
+                if s_name and s_phone and s_pass:
+                    try:
+                        clean_p = s_phone.strip()
+                        # إنشاء يوزر في Supabase
+                        supabase.auth.sign_up({"email": f"{clean_p}@deja.com", "password": s_pass, "options": {"data": {"name": s_name}}})
+                        
+                        # السر هون: إضافة العضو فوراً لقاعدة البيانات برتبة "غير محدد"
+                        if not db.get_member_by_phone(clean_p):
+                            db.add_member((s_name, clean_p, "غير محدد", "غير محدد", "", "غير محدد", "", ""))
+                            
+                        st.success("✅ تم إرسال طلبك! حسابك الآن بانتظار تفعيل الإدارة.")
+                    except: st.error("❌ حدث خطأ، أو الرقم مستخدم مسبقاً.")
+                else:
+                    st.warning("⚠️ يرجى تعبئة جميع الحقول.")
 
 # ==========================================
-# 5. اللوحة الرئيسية (مبنية على الصلاحيات)
+# 5. اللوحة الرئيسية (صلاحيات الإدارة)
 # ==========================================
 else:
-    # 🔒 سحب رتبة المستخدم الحالي لمعرفة صلاحياته
     user_phone = st.session_state['user'].email.split('@')[0]
     live_user_data = db.get_member_by_phone(user_phone)
     current_role = live_user_data[0].get('role', 'غير محدد') if live_user_data else 'غير محدد'
@@ -177,18 +179,17 @@ else:
         st.markdown(f"### 👨‍💻 أهلاً، **{st.session_state['user'].user_metadata.get('name', 'المدير')}**")
         st.caption(f"الرتبة: {current_role}")
         
-        # 🔒 إظهار القائمة حسب الصلاحيات
         if is_admin:
-            menu_options = ["📋 بطاقات المهام", "👥 بطاقات الأعضاء", "➕ إضافة عضو"]
+            menu_options = ["👥 بطاقات الأعضاء", "📋 بطاقات المهام", "➕ إضافة عضو يدوياً"]
         else:
-            menu_options = ["👥 بطاقات الأعضاء"] # العضو العادي بشوف هاي بس
+            menu_options = ["👥 بطاقات الأعضاء"]
             
         menu = st.radio("القائمة:", menu_options)
         st.markdown("---")
         if st.button("خروج 🚪", use_container_width=True):
             supabase.auth.sign_out(); st.session_state['user'] = None; st.rerun()
 
-    # --- صفحة المهام (للإدارة فقط) ---
+    # --- صفحة المهام ---
     if menu == "📋 بطاقات المهام":
         st.title("📋 إدارة مهام الفريق")
         with st.expander("➕ إنشاء مهمة جديدة"):
@@ -196,7 +197,7 @@ else:
                 t_n = st.text_input("اسم المهمة")
                 t_s = st.text_area("الملخص")
                 t_l = st.selectbox("المستوى", TASK_LEVELS)
-                m_names = [m['name'] for m in db.get_all_members()]
+                m_names = [m['name'] for m in db.get_all_members() if m.get('role') != 'غير محدد']
                 t_a = st.multiselect("المسؤولين", options=TEAMS + m_names)
                 if st.form_submit_button("إرسال المهمة 🚀"):
                     db.add_task((t_n, t_s, t_l, ", ".join(t_a))); st.success("تم!"); st.rerun()
@@ -224,33 +225,56 @@ else:
                     with st.container(border=True):
                         st.write(f"**{t['name']}**")
 
-    # --- صفحة الأعضاء (الكل بشوفها، بس الإدارة بتعدل) ---
+    # --- صفحة الأعضاء (نظام التفعيل للإدارة) ---
     elif menu == "👥 بطاقات الأعضاء":
         st.title("👥 فريق Deja")
         members = db.get_all_members()
+        
         if members:
-            cols = st.columns(3)
-            for i, m in enumerate(members):
-                with cols[i % 3]:
-                    bg = "#0e2038" if m.get('gender') == "ذكر" else ("#361125" if m.get('gender') == "أنثى" else "#1E1E1E")
-                    badges = f"<div style='background-color:#FFD700; color:black; padding:2px 8px; border-radius:10px; font-size:10px; position:absolute; left:10px; top:10px;'>{m.get('role', 'عضو')}</div>" if m.get('role') != 'عضو' and m.get('role') != 'غير محدد' else ""
-                    
-                    c_html = f"""
-                    <div style='background-color:{bg}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:140px; margin-bottom:10px; text-align:right;'>
-                        {badges}
-                        <h4 style='color:white; margin:0;'>👤 {m['name']}</h4>
-                        <p style='color:#CCC; font-size:13px; margin:10px 0;'>📍 {m.get('House location', '-')}</p>
-                        <p style='color:#4CAF50; font-weight:bold;'>💯 {m.get('points', 0)} نقطة</p>
-                    </div>
-                    """
-                    st.markdown(c_html, unsafe_allow_html=True)
-                    
-                    if st.button("المزيد ➕", key=f"btn_{m['id']}", use_container_width=True):
-                        # 🔒 تمرير صلاحية المستخدم لداخل البطاقة
-                        member_details_dialog(m, is_admin)
+            # 1. نظام تنبيهات الحسابات الجديدة (فقط للإدارة)
+            if is_admin:
+                new_accounts = [m for m in members if m.get('role') == 'غير محدد']
+                if new_accounts:
+                    st.warning(f"🔔 تنبيه: يوجد ({len(new_accounts)}) حسابات جديدة بانتظار تحديد الصلاحيات والتفعيل!")
+                    cols_new = st.columns(3)
+                    for i, m in enumerate(new_accounts):
+                        with cols_new[i % 3]:
+                            # بطاقة مميزة باللون الأحمر/البرتقالي للحسابات الجديدة
+                            st.markdown(f"""
+                            <div style='background-color:#4a1c1c; padding:15px; border-radius:10px; border: 2px solid #ff9800; margin-bottom:10px; text-align:right;'>
+                                <h4 style='color:#ff9800; margin:0;'>🆕 {m['name']}</h4>
+                                <p style='color:#CCC; font-size:13px; margin:5px 0;'>📞 {m['phone']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            if st.button("⚙️ تفعيل الحساب", key=f"act_{m['id']}", use_container_width=True):
+                                member_details_dialog(m, is_admin)
+                    st.markdown("---")
+            
+            # 2. عرض الأعضاء المفعلين فقط
+            active_members = [m for m in members if m.get('role') != 'غير محدد']
+            if active_members:
+                if is_admin: st.subheader("👥 الأعضاء المفعلين")
+                cols = st.columns(3)
+                for i, m in enumerate(active_members):
+                    with cols[i % 3]:
+                        bg = "#0e2038" if m.get('gender') == "ذكر" else ("#361125" if m.get('gender') == "أنثى" else "#1E1E1E")
+                        badges = f"<div style='background-color:#FFD700; color:black; padding:2px 8px; border-radius:10px; font-size:10px; position:absolute; left:10px; top:10px;'>{m.get('role')}</div>" if m.get('role') not in ['عضو', 'غير محدد'] else ""
+                        
+                        c_html = f"""
+                        <div style='background-color:{bg}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:140px; margin-bottom:10px; text-align:right;'>
+                            {badges}
+                            <h4 style='color:white; margin:0;'>👤 {m['name']}</h4>
+                            <p style='color:#CCC; font-size:13px; margin:10px 0;'>📍 {m.get('House location', '-')}</p>
+                            <p style='color:#4CAF50; font-weight:bold;'>💯 {m.get('points', 0)} نقطة</p>
+                        </div>
+                        """
+                        st.markdown(c_html, unsafe_allow_html=True)
+                        
+                        if st.button("المزيد ➕", key=f"btn_{m['id']}", use_container_width=True):
+                            member_details_dialog(m, is_admin)
 
-    # --- إضافة عضو (للإدارة فقط) ---
-    elif menu == "➕ إضافة عضو":
+    # --- إضافة يدوية ---
+    elif menu == "➕ إضافة عضو يدوياً":
         st.title("➕ تسجيل عضو يدوياً")
         with st.form("a_form"):
             n = st.text_input("الاسم الكامل *")
