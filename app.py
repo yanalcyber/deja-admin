@@ -253,8 +253,7 @@ else:
                 for t in [x for x in tasks if x['status'] == "تم الإنجاز"]:
                     with st.container(border=True):
                         st.write(f"**{t['name']}**")
-
-    # --- 2. صفحة الأعضاء (الآن تعرض المفعلين فقط) ---
+    # --- 2. صفحة الأعضاء (مع محرك البحث والفلاتر) ---
     elif menu == "👥 بطاقات الأعضاء":
         st.title("👥 فريق Deja المفعلين")
         members = db.get_all_members()
@@ -262,23 +261,53 @@ else:
         if members:
             # استخراج الأعضاء المفعلين فقط
             active_members = [m for m in members if m.get('role') != 'غير محدد']
+            
             if active_members:
-                cols = st.columns(3)
-                for i, m in enumerate(active_members):
-                    with cols[i % 3]:
-                        bg = "#0e2038" if m.get('gender') == "ذكر" else ("#361125" if m.get('gender') == "أنثى" else "#1E1E1E")
-                        
-                        badges = f'<div style="background-color:#FFD700; color:black; padding:2px 8px; border-radius:10px; font-size:10px; position:absolute; left:10px; top:10px;">{m.get("role")}</div>' if m.get('role') not in ['عضو', 'غير محدد'] else ""
-                        c_html = f'<div style="background-color:{bg}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:140px; margin-bottom:10px; text-align:right;">{badges}<h4 style="color:white; margin:0px;">👤 {m["name"]}</h4><p style="color:#CCC; font-size:13px; margin:10px 0px;">📍 {m.get("House location", "-")}</p><p style="color:#4CAF50; font-weight:bold;">💯 {m.get("points", 0)} نقطة</p></div>'
-                        
-                        st.markdown(c_html, unsafe_allow_html=True)
-                        
-                        if st.button("المزيد ➕", key=f"btn_{m['id']}", use_container_width=True):
-                            member_details_dialog(m, is_admin)
+                # ---------------------------------------------
+                # 🔍 صندوق البحث والفلاتر الذكي
+                # ---------------------------------------------
+                with st.expander("🔍 أدوات البحث والفلترة", expanded=True):
+                    f_col1, f_col2, f_col3 = st.columns(3)
+                    with f_col1:
+                        search_name = st.text_input("البحث بالاسم 🔎")
+                    with f_col2:
+                        filter_team = st.selectbox("تصفية حسب الفريق 👥", ["الكل"] + TEAMS)
+                    with f_col3:
+                        filter_role = st.selectbox("تصفية حسب الرتبة ⭐", ["الكل"] + [r for r in ROLES if r != 'غير محدد'])
+                
+                # تطبيق الفلاتر برمجياً
+                filtered_members = active_members
+                
+                if search_name:
+                    filtered_members = [m for m in filtered_members if search_name in m['name']]
+                if filter_team != "الكل":
+                    filtered_members = [m for m in filtered_members if m.get('team') and filter_team in m['team']]
+                if filter_role != "الكل":
+                    filtered_members = [m for m in filtered_members if m.get('role') == filter_role]
+
+                st.markdown("---")
+                
+                # ---------------------------------------------
+                # 🪪 عرض البطاقات بعد الفلترة
+                # ---------------------------------------------
+                if filtered_members:
+                    cols = st.columns(3)
+                    for i, m in enumerate(filtered_members):
+                        with cols[i % 3]:
+                            bg = "#0e2038" if m.get('gender') == "ذكر" else ("#361125" if m.get('gender') == "أنثى" else "#1E1E1E")
+                            
+                            badges = f'<div style="background-color:#FFD700; color:black; padding:2px 8px; border-radius:10px; font-size:10px; position:absolute; left:10px; top:10px;">{m.get("role")}</div>' if m.get('role') not in ['عضو', 'غير محدد'] else ""
+                            c_html = f'<div style="background-color:{bg}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:140px; margin-bottom:10px; text-align:right;">{badges}<h4 style="color:white; margin:0px;">👤 {m["name"]}</h4><p style="color:#CCC; font-size:13px; margin:10px 0px;">📍 {m.get("House location", "-")}</p><p style="color:#4CAF50; font-weight:bold;">💯 {m.get("points", 0)} نقطة</p></div>'
+                            
+                            st.markdown(c_html, unsafe_allow_html=True)
+                            
+                            if st.button("المزيد ➕", key=f"btn_{m['id']}", use_container_width=True):
+                                member_details_dialog(m, is_admin)
+                else:
+                    st.warning("⚠️ لم يتم العثور على أعضاء يطابقون شروط البحث.")
             else:
                 st.info("لا يوجد أعضاء مفعلين حتى الآن.")
-
-    # --- 3. الخانة الجديدة: طلبات الانضمام (للإدارة فقط) ---
+        # --- 3. الخانة الجديدة: طلبات الانضمام (للإدارة فقط) ---
     elif menu == "🔔 طلبات الانضمام":
         st.title("🔔 الحسابات بانتظار التفعيل")
         members = db.get_all_members()
@@ -312,3 +341,4 @@ else:
                 if n:
                     db.add_member((n, p, ", ".join(ts), r, res, g, "", ""))
                     st.success("تم!"); st.rerun()
+
