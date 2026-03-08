@@ -9,15 +9,15 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Deja Workspace Pro", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
-html, body, [class*="css"] { font-family: 'Tajawal', sans-serif !important; }
-.stMarkdown, .stText, h1, h2, h3, h4, h5, h6, p, label, .stTextInput, .stSelectbox, .stTextArea, .stRadio, .stMultiSelect {
-    direction: rtl !important; text-align: right !important;
-}
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-</style>
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Tajawal', sans-serif !important; }
+    .stMarkdown, .stText, h1, h2, h3, h4, h5, h6, p, label, .stTextInput, .stSelectbox, .stTextArea, .stRadio, .stMultiSelect {
+        direction: rtl !important; text-align: right !important;
+    }
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
@@ -149,7 +149,9 @@ if st.session_state['user'] is None:
                         u_name = res.user.user_metadata.get('name', 'عضو جديد')
                         db.add_member((u_name, clean_p, "غير محدد", "غير محدد", "", "غير محدد", "", ""))
                     st.rerun()
-                except: st.error("❌ خطأ في البيانات")
+                except Exception as e:
+                    # هون رح يطبعلك الخطأ الحقيقي عشان نصيده!
+                    st.error(f"❌ تفاصيل الخطأ من السيرفر: {str(e)}")
         with tab2:
             s_name = st.text_input("الاسم الكامل", key="reg_name")
             s_phone = st.text_input("رقم الهاتف", key="reg_phone")
@@ -164,7 +166,8 @@ if st.session_state['user'] is None:
                             db.add_member((s_name, clean_p, "غير محدد", "غير محدد", "", "غير محدد", "", ""))
                             
                         st.success("✅ تم إرسال طلبك! حسابك الآن بانتظار تفعيل الإدارة.")
-                    except: st.error("❌ حدث خطأ، أو الرقم مستخدم مسبقاً.")
+                    except Exception as e:
+                        st.error(f"❌ حدث خطأ: {str(e)}")
                 else:
                     st.warning("⚠️ يرجى تعبئة جميع الحقول.")
 
@@ -191,7 +194,6 @@ else:
         if st.button("خروج 🚪", use_container_width=True):
             supabase.auth.sign_out(); st.session_state['user'] = None; st.rerun()
 
-    # --- صفحة المهام ---
     if menu == "📋 بطاقات المهام":
         st.title("📋 إدارة مهام الفريق")
         with st.expander("➕ إنشاء مهمة جديدة"):
@@ -227,7 +229,6 @@ else:
                     with st.container(border=True):
                         st.write(f"**{t['name']}**")
 
-    # --- صفحة الأعضاء ---
     elif menu == "👥 بطاقات الأعضاء":
         st.title("👥 فريق Deja")
         members = db.get_all_members()
@@ -240,8 +241,8 @@ else:
                     cols_new = st.columns(3)
                     for i, m in enumerate(new_accounts):
                         with cols_new[i % 3]:
-                            # السر هون: HTML مسطح تماماً بدون فراغات
-                            new_card = f"<div style='background-color:#4a1c1c; padding:15px; border-radius:10px; border: 2px solid #ff9800; margin-bottom:10px; text-align:right;'><h4 style='color:#ff9800; margin:0;'>🆕 {m['name']}</h4><p style='color:#CCC; font-size:13px; margin:5px 0;'>📞 {m['phone']}</p></div>"
+                            # تصليح الـ HTML باستخدام Double Quotes
+                            new_card = f'<div style="background-color:#4a1c1c; padding:15px; border-radius:10px; border: 2px solid #ff9800; margin-bottom:10px; text-align:right;"><h4 style="color:#ff9800; margin:0px;">🆕 {m["name"]}</h4><p style="color:#CCC; font-size:13px; margin:5px 0px;">📞 {m["phone"]}</p></div>'
                             st.markdown(new_card, unsafe_allow_html=True)
                             if st.button("⚙️ تفعيل الحساب", key=f"act_{m['id']}", use_container_width=True):
                                 member_details_dialog(m, is_admin)
@@ -254,16 +255,16 @@ else:
                 for i, m in enumerate(active_members):
                     with cols[i % 3]:
                         bg = "#0e2038" if m.get('gender') == "ذكر" else ("#361125" if m.get('gender') == "أنثى" else "#1E1E1E")
-                        badges = f"<div style='background-color:#FFD700; color:black; padding:2px 8px; border-radius:10px; font-size:10px; position:absolute; left:10px; top:10px;'>{m.get('role')}</div>" if m.get('role') not in ['عضو', 'غير محدد'] else ""
                         
-                        # السر هون كمان: HTML مسطح بالكامل لحل مشكلة التداخل
-                        c_html = f"<div style='background-color:{bg}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:140px; margin-bottom:10px; text-align:right;'>{badges}<h4 style='color:white; margin:0;'>👤 {m['name']}</h4><p style='color:#CCC; font-size:13px; margin:10px 0;'>📍 {m.get('House location', '-')}</p><p style='color:#4CAF50; font-weight:bold;'>💯 {m.get('points', 0)} نقطة</p></div>"
+                        # تصليح الأوسمة والبطاقات (Double Quotes Only)
+                        badges = f'<div style="background-color:#FFD700; color:black; padding:2px 8px; border-radius:10px; font-size:10px; position:absolute; left:10px; top:10px;">{m.get("role")}</div>' if m.get('role') not in ['عضو', 'غير محدد'] else ""
+                        c_html = f'<div style="background-color:{bg}; padding:20px; border-radius:12px; border: 1px solid #444; position:relative; min-height:140px; margin-bottom:10px; text-align:right;">{badges}<h4 style="color:white; margin:0px;">👤 {m["name"]}</h4><p style="color:#CCC; font-size:13px; margin:10px 0px;">📍 {m.get("House location", "-")}</p><p style="color:#4CAF50; font-weight:bold;">💯 {m.get("points", 0)} نقطة</p></div>'
+                        
                         st.markdown(c_html, unsafe_allow_html=True)
                         
                         if st.button("المزيد ➕", key=f"btn_{m['id']}", use_container_width=True):
                             member_details_dialog(m, is_admin)
 
-    # --- إضافة يدوية ---
     elif menu == "➕ إضافة عضو يدوياً":
         st.title("➕ تسجيل عضو يدوياً")
         with st.form("a_form"):
