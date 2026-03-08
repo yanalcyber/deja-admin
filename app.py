@@ -128,49 +128,72 @@ def member_details_dialog(member, is_admin):
             st.rerun()
 
 # ==========================================
-# 4. واجهة الدخول وإنشاء الحساب
+# 4. واجهة الدخول وإنشاء الحساب (النسخة الخارقة)
 # ==========================================
 if st.session_state['user'] is None:
     st.markdown("<h1 style='text-align: center; color: #4CAF50;'>⚡ Deja Workspace</h1>", unsafe_allow_html=True)
+    
+    # أداة سحرية لتحويل الأرقام العربية إلى إنجليزية تلقائياً
+    arabic_to_english = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
+
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         tab1, tab2 = st.tabs(["تسجيل الدخول", "إنشاء حساب"])
+        
+        # --- تبويبة الدخول ---
         with tab1:
             l_phone = st.text_input("رقم الهاتف", key="log_phone")
             l_pass = st.text_input("كلمة المرور", type="password", key="log_pass")
             if st.button("دخول 🚀", use_container_width=True, type="primary"):
-                try:
-                    clean_p = l_phone.strip()
-                    res = supabase.auth.sign_in_with_password({"email": f"{clean_p}@deja.com", "password": l_pass})
-                    st.session_state['user'] = res.user
+                if l_phone and l_pass:
+                    try:
+                        # تنظيف وتوحيد لغة الأرقام
+                        clean_p = l_phone.translate(arabic_to_english).replace(" ", "").strip()
+                        generated_email = f"{clean_p}@deja.com"
+                        
+                        res = supabase.auth.sign_in_with_password({"email": generated_email, "password": l_pass})
+                        st.session_state['user'] = res.user
+                        st.rerun()
+                    except Exception as e:
+                        st.error("❌ كلمة المرور أو رقم الهاتف غير صحيح.")
+                else:
+                    st.warning("⚠️ يرجى تعبئة الحقول أولاً.")
                     
-                    existing_member = db.get_member_by_phone(clean_p)
-                    if not existing_member:
-                        u_name = res.user.user_metadata.get('name', 'عضو جديد')
-                        db.add_member((u_name, clean_p, "غير محدد", "غير محدد", "", "غير محدد", "", ""))
-                    st.rerun()
-                except Exception as e:
-                    # هون رح يطبعلك الخطأ الحقيقي عشان نصيده!
-                    st.error(f"❌ تفاصيل الخطأ من السيرفر: {str(e)}")
+        # --- تبويبة إنشاء حساب (مع دخول تلقائي) ---
         with tab2:
             s_name = st.text_input("الاسم الكامل", key="reg_name")
             s_phone = st.text_input("رقم الهاتف", key="reg_phone")
-            s_pass = st.text_input("كلمة المرور", type="password", key="reg_pass")
-            if st.button("إنشاء حساب ✍️", use_container_width=True):
+            s_pass = st.text_input("كلمة المرور (6 خانات على الأقل)", type="password", key="reg_pass")
+            if st.button("إنشاء حساب 🚀", use_container_width=True):
                 if s_name and s_phone and s_pass:
-                    try:
-                        clean_p = s_phone.strip()
-                        supabase.auth.sign_up({"email": f"{clean_p}@deja.com", "password": s_pass, "options": {"data": {"name": s_name}}})
-                        
-                        if not db.get_member_by_phone(clean_p):
-                            db.add_member((s_name, clean_p, "غير محدد", "غير محدد", "", "غير محدد", "", ""))
+                    if len(s_pass) < 6:
+                        st.error("❌ كلمة المرور ضعيفة! يجب أن تكون 6 خانات على الأقل.")
+                    else:
+                        try:
+                            # تنظيف وتوحيد لغة الأرقام
+                            clean_p = s_phone.translate(arabic_to_english).replace(" ", "").strip()
+                            generated_email = f"{clean_p}@deja.com"
                             
-                        st.success("✅ تم إرسال طلبك! حسابك الآن بانتظار تفعيل الإدارة.")
-                    except Exception as e:
-                        st.error(f"❌ حدث خطأ: {str(e)}")
+                            # إنشاء الحساب في Supabase
+                            res = supabase.auth.sign_up({"email": generated_email, "password": s_pass, "options": {"data": {"name": s_name}}})
+                            
+                            # إضافة للقاعدة إذا مش موجود
+                            if not db.get_member_by_phone(clean_p):
+                                db.add_member((s_name, clean_p, "غير محدد", "غير محدد", "", "غير محدد", "", ""))
+                            
+                            # الدخول التلقائي المباشر!
+                            if res.session:
+                                st.session_state['user'] = res.user
+                                st.rerun()
+                            else:
+                                st.warning("⚠️ تم إنشاء الحساب، ولكن خيار (تأكيد الإيميل) لا يزال يعمل في Supabase! يرجى إيقافه.")
+                        except Exception as e:
+                            if "already registered" in str(e).lower():
+                                st.error("❌ هذا الرقم مسجل مسبقاً! جرب تسجل دخول من الخانة المجاورة.")
+                            else:
+                                st.error(f"❌ حدث خطأ: {str(e)}")
                 else:
                     st.warning("⚠️ يرجى تعبئة جميع الحقول.")
-
 # ==========================================
 # 5. اللوحة الرئيسية (صلاحيات الإدارة)
 # ==========================================
@@ -278,3 +301,4 @@ else:
                 if n:
                     db.add_member((n, p, ", ".join(ts), r, res, g, "", ""))
                     st.success("تم!"); st.rerun()
+
