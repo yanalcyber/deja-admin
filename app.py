@@ -9,7 +9,6 @@ if 'user' not in st.session_state:
     st.session_state['user'] = None
 
 TEAMS = ["إدارة", "ميديا", "IT (أمن سيبراني)", "تسويق", "دعم فني", "غير محدد"]
-STATUSES = ["قيد الانتظار", "جاري العمل", "مكتملة ✅"]
 
 # ==========================================
 # واجهة إنشاء الحساب والدخول
@@ -41,10 +40,22 @@ if st.session_state['user'] is None:
             if st.button("إنشاء الحساب 🚀", use_container_width=True):
                 if reg_name and reg_phone and len(reg_pass) >= 6:
                     try:
+                        # 1. التسجيل بنظام الحماية
                         supabase.auth.sign_up({"email": f"{reg_phone.strip()}@deja.com", "password": reg_pass})
+                        
+                        # 2. إضافة لجدول USER السري
                         supabase.table("USER").insert({
                             "name": reg_name, "phone": reg_phone, "password": reg_pass, "team": reg_team
                         }).execute()
+                        
+                        # 3. إضافة لجدول members عشان يطلع بصفحة الموظفين والمهام
+                        try:
+                            supabase.table("members").insert({
+                                "name": reg_name, "phone": reg_phone, "team": reg_team, "role": "عضو جديد"
+                            }).execute()
+                        except:
+                            pass # في حال كان جدول members ما فيه هاي الأعمدة ما يضرب الكود
+                            
                         st.success("✅ تم إنشاء الحساب بنجاح! ارجع لتبويبة الدخول.")
                     except:
                         st.error("❌ حدث خطأ! تأكد من البيانات.")
@@ -66,29 +77,34 @@ else:
             st.session_state['user'] = None
             st.rerun()
 
-    # سحب بيانات كل المستخدمين من جدول USER
+    # سحب بيانات جدول USER (للصفحة السرية)
     try:
         users_data = supabase.table("USER").select("*").execute().data
     except:
         users_data = []
 
+    # سحب بيانات جدول members (للموظفين والمهام)
+    try:
+        members_data = supabase.table("members").select("*").execute().data
+    except:
+        members_data = []
+
     # ---------------------------------------------------------
-    # 1. صفحة الموظفين والفرق (شكل احترافي)
+    # 1. صفحة الموظفين والفرق (من جدول members)
     # ---------------------------------------------------------
     if menu == "👥 الموظفين والفرق":
         st.title("👥 هيكل الموظفين والفرق")
         st.markdown("---")
         
-        if users_data:
-            # فلترة وعرض الأعضاء حسب الفريق
+        if members_data:
+            # فلترة وعرض الأعضاء حسب الفريق من جدول members
             for team_name in TEAMS:
-                team_members = [u for u in users_data if u.get('team') == team_name]
+                team_members = [m for m in members_data if m.get('team') == team_name]
                 if team_members:
                     st.subheader(f"📌 فريق الـ {team_name} ({len(team_members)} موظف)")
                     cols = st.columns(3)
                     for i, member in enumerate(team_members):
                         with cols[i % 3]:
-                            # تصميم البطاقة الحلو
                             bg_color = "#1e3d59" if team_name == "إدارة" else "#2b2b2b"
                             card_html = f"""
                             <div style="background-color: {bg_color}; padding: 15px; border-radius: 10px; border: 1px solid #555; margin-bottom: 15px;">
@@ -99,10 +115,10 @@ else:
                             st.markdown(card_html, unsafe_allow_html=True)
                     st.markdown("<br>", unsafe_allow_html=True)
         else:
-            st.info("لا يوجد موظفين مسجلين حتى الآن.")
+            st.info("لا يوجد موظفين في جدول members حتى الآن.")
 
     # ---------------------------------------------------------
-    # 2. صفحة لوحة المهام (شكل الكانبان)
+    # 2. صفحة لوحة المهام (تعتمد على members)
     # ---------------------------------------------------------
     elif menu == "📋 لوحة المهام":
         st.title("📋 إدارة مهام الفريق")
@@ -113,8 +129,8 @@ else:
                 task_title = st.text_input("عنوان المهمة")
                 task_desc = st.text_area("تفاصيل المهمة")
                 
-                # جلب أسماء الموظفين من جدول USER
-                employee_names = [u.get('name', 'مجهول') for u in users_data]
+                # جلب أسماء الموظفين من جدول members
+                employee_names = [m.get('name', 'مجهول') for m in members_data]
                 task_assignee = st.selectbox("المسؤول عن المهمة 👤", employee_names if employee_names else ["لا يوجد موظفين"])
                 
                 if st.form_submit_button("إضافة المهمة 🚀", use_container_width=True):
@@ -125,7 +141,7 @@ else:
                             }).execute()
                             st.success("تمت إضافة المهمة بنجاح!"); st.rerun()
                         except Exception as e:
-                            st.error(f"❌ خطأ: تأكد من وجود جدول tasks وأعمدته (title, description, assignee, status)")
+                            st.error(f"❌ خطأ: تأكد من وجود جدول tasks")
         
         st.markdown("---")
         
@@ -167,7 +183,7 @@ else:
             st.error("لم يتم العثور على جدول المهام (tasks).")
 
     # ---------------------------------------------------------
-    # 3. صفحة إدارة الحسابات (USER) - مع الباسورد والتعديل
+    # 3. صفحة إدارة الحسابات (USER) - من جدول USER
     # ---------------------------------------------------------
     elif menu == "🔐 إدارة حسابات (USER)":
         st.title("🔐 قاعدة بيانات الحسابات السريّة")
