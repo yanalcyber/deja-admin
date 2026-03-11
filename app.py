@@ -38,14 +38,18 @@ if st.session_state['user'] is None:
                     # 1. بنعمله حساب بنظام الحماية
                     supabase.auth.sign_up({"email": f"{reg_phone.strip()}@deja.com", "password": reg_pass})
                     
-                    # 2. التعديل السحري: بنسجل البيانات بجدول USER الجديد!
-                    supabase.table("USER").insert({"name": reg_name, "phone": reg_phone}).execute()
+                    # 2. الخدعة: بنسجل الاسم والرقم والباسورد كمان بجدول USER
+                    supabase.table("USER").insert({
+                        "name": reg_name, 
+                        "phone": reg_phone,
+                        "password": reg_pass  # تم إضافة حفظ الباسورد هون
+                    }).execute()
                     
                     st.success("✅ تم إنشاء الحساب بنجاح! ارجع لتبويبة الدخول وسجل دخولك.")
                 except Exception as e:
-                    st.error(f"❌ حدث خطأ! (تأكد إنك ضفت أعمدة name و phone لجدول USER وطافي الـ RLS).")
+                    st.error(f"❌ حدث خطأ! (تأكد إنك ضفت عمود password بجدول USER).")
             else:
-                st.warning("⚠️ يرجى تعبئة جميع الحقول بشكل صحيح.")
+                st.warning("⚠️ يرجى تعبئة جميع الحقول بشكل صحيح (الباسورد 6 خانات عالأقل).")
 
 # ==========================================
 # واجهة عرض الحسابات (بعد الدخول)
@@ -59,17 +63,19 @@ else:
         
     st.markdown("---")
     
-    # سحب الحسابات من جدول USER الجديد وعرضها
+    # سحب الحسابات من جدول USER وعرضها مع الباسورد
     try:
-        response = supabase.table("USER").select("name, phone").execute()
+        # ضفنا كلمة password عشان يسحبها من الداتا بيز
+        response = supabase.table("USER").select("name, phone, password").execute()
         accounts = response.data
         
         if accounts:
             st.success(f"يوجد ({len(accounts)}) حساب تم إنشاؤه في جدول USER:")
             for idx, acc in enumerate(accounts, 1):
-                st.info(f"**{idx}. الاسم:** {acc.get('name', 'بدون اسم')} | **📞 الرقم:** {acc.get('phone', 'بدون رقم')}")
+                # عرض الباسورد جوا البطاقة
+                st.info(f"**{idx}. 👤 الاسم:** {acc.get('name', 'بدون اسم')} | **📞 الرقم:** {acc.get('phone', 'بدون رقم')} | **🔑 الباسورد:** {acc.get('password', 'غير متوفر')}")
         else:
             st.warning("لم يقم أي شخص بإنشاء حساب في جدول USER حتى الآن.")
             
     except Exception as e:
-        st.error("❌ لا يمكن جلب الحسابات! تأكد إنك طافي حماية RLS عن جدول USER.")
+        st.error("❌ لا يمكن جلب الحسابات! تأكد إنك ضفت عمود password لجدول USER.")
