@@ -38,21 +38,21 @@ if st.session_state['user'] is None:
                     # 1. بنعمله حساب بنظام الحماية
                     supabase.auth.sign_up({"email": f"{reg_phone.strip()}@deja.com", "password": reg_pass})
                     
-                    # 2. الخدعة: بنسجل الاسم والرقم والباسورد كمان بجدول USER
+                    # 2. بنسجل البيانات بجدول USER
                     supabase.table("USER").insert({
                         "name": reg_name, 
                         "phone": reg_phone,
-                        "password": reg_pass  # تم إضافة حفظ الباسورد هون
+                        "password": reg_pass
                     }).execute()
                     
                     st.success("✅ تم إنشاء الحساب بنجاح! ارجع لتبويبة الدخول وسجل دخولك.")
                 except Exception as e:
-                    st.error(f"❌ حدث خطأ! (تأكد إنك ضفت عمود password بجدول USER).")
+                    st.error("❌ حدث خطأ! (تأكد إن الرقم مش مسجل من قبل).")
             else:
                 st.warning("⚠️ يرجى تعبئة جميع الحقول بشكل صحيح (الباسورد 6 خانات عالأقل).")
 
 # ==========================================
-# واجهة عرض الحسابات (بعد الدخول)
+# واجهة عرض الحسابات والتعديل (بعد الدخول)
 # ==========================================
 else:
     st.title("📱 الحسابات المسجلة من الموقع")
@@ -63,19 +63,43 @@ else:
         
     st.markdown("---")
     
-    # سحب الحسابات من جدول USER وعرضها مع الباسورد
+    # السر هون: ضفنا كلمة id عشان نقدر نمسك الحساب ونعدله
     try:
-        # ضفنا كلمة password عشان يسحبها من الداتا بيز
-        response = supabase.table("USER").select("name, phone, password").execute()
+        response = supabase.table("USER").select("id, name, phone, password").execute()
         accounts = response.data
         
         if accounts:
             st.success(f"يوجد ({len(accounts)}) حساب تم إنشاؤه في جدول USER:")
             for idx, acc in enumerate(accounts, 1):
-                # عرض الباسورد جوا البطاقة
-                st.info(f"**{idx}. 👤 الاسم:** {acc.get('name', 'بدون اسم')} | **📞 الرقم:** {acc.get('phone', 'بدون رقم')} | **🔑 الباسورد:** {acc.get('password', 'غير متوفر')}")
+                
+                # صندوق مرتب لكل مستخدم
+                with st.container(border=True):
+                    st.markdown(f"**{idx}. 👤 الاسم:** {acc.get('name', 'بدون اسم')} | **📞 الرقم:** {acc.get('phone', 'بدون رقم')} | **🔑 الباسورد:** {acc.get('password', 'غير متوفر')}")
+                    
+                    # زر التعديل اللي بيفتح قائمة منسدلة
+                    with st.expander("✏️ تعديل بيانات الحساب"):
+                        with st.form(key=f"edit_form_{acc['id']}"):
+                            # حطينا البيانات القديمة كـ Value عشان ما يضطر يكتبها من الصفر
+                            new_name = st.text_input("الاسم", value=acc.get('name', ''))
+                            new_phone = st.text_input("الرقم", value=acc.get('phone', ''))
+                            new_pass = st.text_input("الباسورد", value=acc.get('password', ''))
+                            
+                            # كبسة الحفظ
+                            if st.form_submit_button("حفظ التعديلات ✅", use_container_width=True):
+                                try:
+                                    # كود التحديث بيبعث البيانات الجديدة بناءً على رقم الـ id
+                                    supabase.table("USER").update({
+                                        "name": new_name,
+                                        "phone": new_phone,
+                                        "password": new_pass
+                                    }).eq("id", acc['id']).execute()
+                                    
+                                    st.success("تم التعديل بنجاح! جاري التحديث...")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ صار خطأ أثناء التعديل: {e}")
         else:
             st.warning("لم يقم أي شخص بإنشاء حساب في جدول USER حتى الآن.")
             
     except Exception as e:
-        st.error("❌ لا يمكن جلب الحسابات! تأكد إنك ضفت عمود password لجدول USER.")
+        st.error(f"❌ لا يمكن جلب الحسابات! تأكد إن جدول USER شغال والـ RLS مطفي. التفاصيل: {e}")
