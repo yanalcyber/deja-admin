@@ -35,15 +35,15 @@ if st.session_state['user'] is None:
         if st.button("إنشاء الحساب ✍️", use_container_width=True):
             if reg_name and reg_phone and len(reg_pass) >= 6:
                 try:
-                    # 1. بنعمله حساب بنظام الحماية عشان يقدر يدخل
+                    # 1. بنعمله حساب بنظام الحماية
                     supabase.auth.sign_up({"email": f"{reg_phone.strip()}@deja.com", "password": reg_pass})
                     
-                    # 2. بنسجل اسمه بجدول الموقع عشان تشوفه أنت بالشاشة
-                    supabase.table("members").insert({"name": reg_name, "phone": reg_phone}).execute()
+                    # 2. التعديل السحري: بنسجل البيانات بجدول USER الجديد!
+                    supabase.table("USER").insert({"name": reg_name, "phone": reg_phone}).execute()
                     
                     st.success("✅ تم إنشاء الحساب بنجاح! ارجع لتبويبة الدخول وسجل دخولك.")
                 except Exception as e:
-                    st.error("❌ حدث خطأ! (تأكد إن الرقم مش مسجل من قبل، وإن الـ RLS مطفي في Supabase).")
+                    st.error(f"❌ حدث خطأ! (تأكد إنك ضفت أعمدة name و phone لجدول USER وطافي الـ RLS).")
             else:
                 st.warning("⚠️ يرجى تعبئة جميع الحقول بشكل صحيح.")
 
@@ -59,18 +59,17 @@ else:
         
     st.markdown("---")
     
-    # سحب الحسابات من قاعدة البيانات وعرضها
+    # سحب الحسابات من جدول USER الجديد وعرضها
     try:
-        response = supabase.table("members").select("name, phone").execute()
+        response = supabase.table("USER").select("name, phone").execute()
         accounts = response.data
         
         if accounts:
-            st.success(f"يوجد ({len(accounts)}) حساب تم إنشاؤه من الموقع:")
+            st.success(f"يوجد ({len(accounts)}) حساب تم إنشاؤه في جدول USER:")
             for idx, acc in enumerate(accounts, 1):
-                # عرض كل حساب ببطاقة مرتبة
                 st.info(f"**{idx}. الاسم:** {acc.get('name', 'بدون اسم')} | **📞 الرقم:** {acc.get('phone', 'بدون رقم')}")
         else:
-            st.warning("لم يقم أي شخص بإنشاء حساب من الموقع حتى الآن.")
+            st.warning("لم يقم أي شخص بإنشاء حساب في جدول USER حتى الآن.")
             
     except Exception as e:
-        st.error("❌ لا يمكن جلب الحسابات! يرجى الذهاب إلى Supabase -> جدول members -> وإيقاف حماية RLS.")
+        st.error("❌ لا يمكن جلب الحسابات! تأكد إنك طافي حماية RLS عن جدول USER.")
