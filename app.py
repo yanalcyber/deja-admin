@@ -8,6 +8,9 @@ supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 if 'user' not in st.session_state:
     st.session_state['user'] = None
 
+# قائمة الفرق (بتقدر تزيد عليها أو تعدلها)
+TEAMS = ["غير محدد", "إدارة", "ميديا", "IT (أمن سيبراني)", "تسويق", "دعم فني"]
+
 # ==========================================
 # واجهة إنشاء الحساب والدخول
 # ==========================================
@@ -30,6 +33,7 @@ if st.session_state['user'] is None:
     with tab2:
         reg_name = st.text_input("الاسم الكامل")
         reg_phone = st.text_input("رقم الهاتف")
+        reg_team = st.selectbox("الفريق 👥", TEAMS) # إضافة خيار الفريق هون
         reg_pass = st.text_input("كلمة المرور (6 خانات)", type="password")
         
         if st.button("إنشاء الحساب ✍️", use_container_width=True):
@@ -38,16 +42,17 @@ if st.session_state['user'] is None:
                     # 1. بنعمله حساب بنظام الحماية
                     supabase.auth.sign_up({"email": f"{reg_phone.strip()}@deja.com", "password": reg_pass})
                     
-                    # 2. بنسجل البيانات بجدول USER
+                    # 2. بنسجل البيانات بجدول USER مع الفريق
                     supabase.table("USER").insert({
                         "name": reg_name, 
                         "phone": reg_phone,
-                        "password": reg_pass
+                        "password": reg_pass,
+                        "team": reg_team
                     }).execute()
                     
                     st.success("✅ تم إنشاء الحساب بنجاح! ارجع لتبويبة الدخول وسجل دخولك.")
                 except Exception as e:
-                    st.error("❌ حدث خطأ! (تأكد إن الرقم مش مسجل من قبل).")
+                    st.error("❌ حدث خطأ! (تأكد إنك ضفت عمود team بجدول USER).")
             else:
                 st.warning("⚠️ يرجى تعبئة جميع الحقول بشكل صحيح (الباسورد 6 خانات عالأقل).")
 
@@ -63,35 +68,40 @@ else:
         
     st.markdown("---")
     
-    # السر هون: ضفنا كلمة id عشان نقدر نمسك الحساب ونعدله
+    # ضفنا كلمة team عشان نسحبها من القاعدة
     try:
-        response = supabase.table("USER").select("id, name, phone, password").execute()
+        response = supabase.table("USER").select("id, name, phone, password, team").execute()
         accounts = response.data
         
         if accounts:
             st.success(f"يوجد ({len(accounts)}) حساب تم إنشاؤه في جدول USER:")
             for idx, acc in enumerate(accounts, 1):
                 
-                # صندوق مرتب لكل مستخدم
+                # صندوق مرتب لكل مستخدم بيعرض كل بياناته
                 with st.container(border=True):
-                    st.markdown(f"**{idx}. 👤 الاسم:** {acc.get('name', 'بدون اسم')} | **📞 الرقم:** {acc.get('phone', 'بدون رقم')} | **🔑 الباسورد:** {acc.get('password', 'غير متوفر')}")
+                    current_team = acc.get('team', 'غير محدد')
+                    st.markdown(f"**{idx}. 👤 الاسم:** {acc.get('name', 'بدون اسم')} | **📞 الرقم:** {acc.get('phone', 'بدون رقم')}")
+                    st.markdown(f"**🔑 الباسورد:** {acc.get('password', 'غير متوفر')} | **👥 الفريق:** `{current_team}`")
                     
-                    # زر التعديل اللي بيفتح قائمة منسدلة
+                    # زر التعديل
                     with st.expander("✏️ تعديل بيانات الحساب"):
                         with st.form(key=f"edit_form_{acc['id']}"):
-                            # حطينا البيانات القديمة كـ Value عشان ما يضطر يكتبها من الصفر
                             new_name = st.text_input("الاسم", value=acc.get('name', ''))
                             new_phone = st.text_input("الرقم", value=acc.get('phone', ''))
                             new_pass = st.text_input("الباسورد", value=acc.get('password', ''))
                             
+                            # تحديد الفريق القديم كقيمة افتراضية بالصندوق
+                            team_index = TEAMS.index(current_team) if current_team in TEAMS else 0
+                            new_team = st.selectbox("الفريق", TEAMS, index=team_index)
+                            
                             # كبسة الحفظ
                             if st.form_submit_button("حفظ التعديلات ✅", use_container_width=True):
                                 try:
-                                    # كود التحديث بيبعث البيانات الجديدة بناءً على رقم الـ id
                                     supabase.table("USER").update({
                                         "name": new_name,
                                         "phone": new_phone,
-                                        "password": new_pass
+                                        "password": new_pass,
+                                        "team": new_team
                                     }).eq("id", acc['id']).execute()
                                     
                                     st.success("تم التعديل بنجاح! جاري التحديث...")
@@ -102,4 +112,4 @@ else:
             st.warning("لم يقم أي شخص بإنشاء حساب في جدول USER حتى الآن.")
             
     except Exception as e:
-        st.error(f"❌ لا يمكن جلب الحسابات! تأكد إن جدول USER شغال والـ RLS مطفي. التفاصيل: {e}")
+        st.error(f"❌ لا يمكن جلب الحسابات! تأكد إنك ضفت عمود team لجدول USER. التفاصيل: {e}")
