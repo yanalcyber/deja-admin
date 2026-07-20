@@ -92,9 +92,9 @@ section{padding:50px 20px;max-width:1300px;margin:0 auto;}
 /* ===== Bracket ===== */
 .bracket-wrapper{overflow-x:auto;padding:20px 0 40px 0;}
 .bracket{
-  display:flex;flex-direction:row-reverse; /* first round on the right for RTL feel */
+  display:flex;flex-direction:row-reverse;
   direction:ltr; min-width:1400px; gap:0;
-  --uh:44px; /* unit height of a round-32 match */
+  --uh:44px;
 }
 .round{display:flex;flex-direction:column;justify-content:space-around;position:relative;flex:1;min-width:170px;padding:0 26px;}
 .round-label{
@@ -194,7 +194,7 @@ footer{
   </div>
   <div class="bracket-wrapper">
     <div class="bracket" id="bracketContainer">
-      <!-- filled by JS -->
+      <!-- سيتم التعبئة بواسطة الجافاسكربت -->
     </div>
   </div>
 </section>
@@ -221,7 +221,8 @@ footer{
 </footer>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyZd8eJT0Q_riHJM2XOkNFxgKoFwrirE18A16cmK6dBzLW5PNEIPl_w0YgqrdMgJlOr/exec';
+// الرابط الصحيح والمطابق للصورة المرفقة
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyZd8eJT0Q_riHJM2XOkNFxgKoFwrirE18A16cmK6dBzLW5PNEIPl_w0YgqrdMgJIOr/exec';
 const REFRESH_MS = 20000;
 
 const ROUND_SIZES = [
@@ -269,7 +270,7 @@ function renderBracket(rows) {
     container.appendChild(roundEl);
   });
 
-  // Champion
+  // البطل
   const champValue = cellValue(rows[0], 5);
   const champRoundEl = document.createElement('div');
   champRoundEl.className = 'round round-champion';
