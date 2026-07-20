@@ -9,7 +9,155 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <!-- مكتبة Panzoom -->
-<script src="https://unpkg.com/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
+<script>
+/**
+ * DEJA CREW - ADVANCED ENGINE
+ */
+// الرابط الصحيح 100% الذي نسخته أنت من حسابك
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyZd8eJT0Q_riHJM2XOkNFxgKoFwrirE18A16cmK6dBzLW5PNEIPl_w0YgqrdMgJlOr/exec';
+const REFRESH_MS = 25000;
+
+// إعداد الكاميرا (Panzoom)
+const canvasElem = document.getElementById('bracketCanvas');
+const panzoomInstance = Panzoom(canvasElem, {
+  maxScale: 1.5, minScale: 0.25, startScale: 0.6,
+  contain: 'outside', canvas: true
+});
+canvasElem.parentElement.addEventListener('wheel', panzoomInstance.zoomWithWheel);
+document.getElementById('zoomIn').addEventListener('click', panzoomInstance.zoomIn);
+document.getElementById('zoomOut').addEventListener('click', panzoomInstance.zoomOut);
+document.getElementById('zoomReset').addEventListener('click', () => {
+  panzoomInstance.reset(); panzoomInstance.zoom(0.6);
+});
+
+// الهيكل البنائي للبطولة
+const ROUND_CONFIG = [
+  { key: 'r32', col: 0, size: 32, cls: 'round-32', label: 'دور الـ 32' },
+  { key: 'r16', col: 1, size: 16, cls: 'round-16', label: 'دور الـ 16' },
+  { key: 'qf',  col: 2, size: 8,  cls: 'round-qf', label: 'ربع النهائي' },
+  { key: 'sf',  col: 3, size: 4,  cls: 'round-sf', label: 'نصف النهائي' },
+  { key: 'fin', col: 4, size: 2,  cls: 'round-final', label: 'النهائي' },
+];
+
+function generateSkeleton() {
+  const container = document.getElementById('bracketContainer');
+  container.innerHTML = '';
+  
+  ROUND_CONFIG.forEach(round => {
+    const roundEl = document.createElement('div');
+    roundEl.className = `round ${round.cls}`;
+    roundEl.innerHTML = `<div class="round-label">${round.label}</div>`;
+    for(let i=0; i<round.size; i++) {
+      roundEl.innerHTML += `<div class="match"><div class="team-box skeleton"><i class="fa-solid fa-shield"></i> جاري التحميل</div></div>`;
+    }
+    container.appendChild(roundEl);
+  });
+
+  // هيكل البطل
+  const champHTML = `
+    <div class="round round-champion">
+      <div class="round-label">البطل</div>
+      <div class="match">
+        <div class="champion-box skeleton">
+          <i class="fa-solid fa-trophy"></i><span>تحميل...</span>
+        </div>
+      </div>
+    </div>`;
+  container.insertAdjacentHTML('beforeend', champHTML);
+  
+  // هياكل الإحصائيات
+  const statSkeleton = `<li class="skeleton">جاري تحميل البيانات...</li>`.repeat(4);
+  document.getElementById('teamStatsList').innerHTML = statSkeleton;
+  document.getElementById('playerStatsList').innerHTML = statSkeleton;
+}
+
+async function fetchAPI() {
+  const res = await fetch(`${APPS_SCRIPT_URL}?_=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error('API Error');
+  const data = await res.json();
+  return data.values || [];
+}
+
+function renderUI(rows) {
+  const container = document.getElementById('bracketContainer');
+  container.style.opacity = '0'; // لعمل تأثير انتقال ناعم
+  
+  setTimeout(() => {
+    container.innerHTML = '';
+    
+    ROUND_CONFIG.forEach(round => {
+      const roundEl = document.createElement('div');
+      roundEl.className = `round ${round.cls}`;
+      roundEl.innerHTML = `<div class="round-label">${round.label}</div>`;
+      
+      for(let i=0; i<round.size; i++) {
+        const val = rows[i] ? rows[i][round.col] : null;
+        const text = (val && String(val).trim() !== '') ? String(val).trim() : null;
+        const stateClass = text ? 'filled' : 'pending';
+        const display = text || 'قريباً';
+        const icon = text ? 'fa-shield-halved' : 'fa-lock';
+        
+        roundEl.innerHTML += `
+          <div class="match">
+            <div class="team-box ${stateClass}">
+              <i class="fa-solid ${icon}"></i> <span>${display}</span>
+            </div>
+          </div>`;
+      }
+      container.appendChild(roundEl);
+    });
+
+    // رسم البطل
+    const champVal = rows[0] ? rows[0][5] : null;
+    const champText = (champVal && String(champVal).trim() !== '') ? String(champVal).trim() : null;
+    const champHTML = `
+      <div class="round round-champion">
+        <div class="round-label">البطل</div>
+        <div class="match">
+          <div class="champion-box ${champText ? '' : 'pending'}">
+            <i class="fa-solid fa-trophy"></i>
+            <span>${champText || 'لم يُحسم'}</span>
+          </div>
+        </div>
+      </div>`;
+    container.insertAdjacentHTML('beforeend', champHTML);
+    
+    // رسم الإحصائيات
+    const renderStats = (id, col) => {
+      const items = rows.map(r => r[col]).filter(v => v && String(v).trim() !== '');
+      document.getElementById(id).innerHTML = items.length 
+        ? items.map(v => `<li><i class="fa-solid fa-caret-left" style="color:var(--primary); margin-left:10px;"></i> ${v}</li>`).join('')
+        : `<li style="color:var(--text-muted); text-align:center;">لا توجد بيانات</li>`;
+    };
+    renderStats('teamStatsList', 6);
+    renderStats('playerStatsList', 7);
+
+    container.style.opacity = '1';
+  }, 300);
+}
+
+async function bootEngine(manual = false) {
+  const btn = document.getElementById('refreshBtn');
+  const status = document.getElementById('lastUpdated');
+  
+  if(manual) btn.classList.add('spinning');
+  if(!manual && !document.querySelector('.team-box:not(.skeleton)')) generateSkeleton();
+
+  try {
+    const data = await fetchAPI();
+    renderUI(data);
+    status.innerHTML = `<i class="fa-solid fa-check-circle" style="color:#10b981"></i> متصل - آخر مزامنة: ${new Date().toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}`;
+  } catch (err) {
+    status.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:#ef4444"></i> خطأ في الاتصال بالسيرفر`;
+  } finally {
+    if(manual) setTimeout(() => btn.classList.remove('spinning'), 500);
+  }
+}
+
+document.getElementById('refreshBtn').addEventListener('click', () => bootEngine(true));
+bootEngine(); // التشغيل الأولي
+setInterval(() => bootEngine(), REFRESH_MS); // التشغيل التلقائي
+</script>
 <style>
 /* =========================================
    DEJA CREW - ULTIMATE PRO EDITION
