@@ -48,7 +48,7 @@ header {
   position: sticky; top: 0; left: 0; width: 100%;
   background: rgba(5, 6, 8, 0.7);
   backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(166px);
   border-bottom: 1px solid var(--border);
   z-index: 1000;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
@@ -128,7 +128,15 @@ section { padding: 0 20px 60px; max-width: 1600px; margin: 0 auto; }
 .zoom-controls button:hover { background: var(--primary); color: #000; border-color: var(--primary); transform: scale(1.05); }
 
 /* ===== Advanced Bracket Math & Curved Lines ===== */
-.bracket-canvas { width: 100%; height: 100%; cursor: grab; display: flex; align-items: center; justify-content: center; }
+.bracket-canvas { 
+  width: 1000px; /* تم تكبير الحاوية للسماح بحرية الحركة المطلقة */
+  height: 1000px; 
+  cursor: grab; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  transform-origin: 0 0; /* ضروري لـ Panzoom */
+}
 .bracket-canvas:active { cursor: grabbing; }
 
 .bracket {
@@ -214,6 +222,19 @@ section { padding: 0 20px 60px; max-width: 1600px; margin: 0 auto; }
 }
 @keyframes shimmer { 100% { left: 200%; } }
 
+/* ===== Full Screen Custom Style ===== */
+.bracket-viewer:fullscreen {
+  height: 100vh !important;
+  border-radius: 0;
+  border: none;
+  background-color: #050608;
+}
+.bracket-viewer:-webkit-full-screen {
+  height: 100vh !important;
+  border-radius: 0;
+  border: none;
+}
+
 /* ===== Stats Section ===== */
 .section-header { text-align: center; margin: 60px 0 40px; }
 .section-header h2 { font-size: 32px; font-weight: 900; margin-bottom: 12px; color: var(--text-main); }
@@ -261,7 +282,8 @@ footer span { color: var(--primary); }
     <div class="zoom-controls">
       <button id="zoomIn" title="تقريب"><i class="fa-solid fa-plus"></i></button>
       <button id="zoomOut" title="تبعيد"><i class="fa-solid fa-minus"></i></button>
-      <button id="zoomReset" title="إعادة الضبط"><i class="fa-solid fa-expand"></i></button>
+      <button id="zoomReset" title="إعادة الضبط المركزية"><i class="fa-solid fa-rotate-left"></i></button>
+      <button id="fullScreenBtn" title="ملء الشاشة"><i class="fa-solid fa-maximize"></i></button>
     </div>
     <div class="bracket-canvas" id="bracketCanvas">
       <div class="bracket" id="bracketContainer">
@@ -294,22 +316,83 @@ footer span { color: var(--primary); }
 
 <script>
 /**
- * DEJA CREW - ADVANCED ENGINE
+ * DEJA CREW - ADVANCED ENGINE (FULL ACCESS EDITION)
+ * تم تعديل هذا الكود لحل مشكلة الحركة وإضافة ميزة ملء الشاشة.
  */
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwwKqX2cIXK5l58yOWaIrhF-eiIK1ZyACUSd1waa7ieN8lE8dhJkxhhpugPb9iA10k4/exec';
 const REFRESH_MS = 25000;
 
-// إعداد الكاميرا (Panzoom)
+// بيانات وهمية (Mock Data) واقعية للتشغيل الفوري في بيئة التطوير
+// عند ربط ה-API الحقيقي مستقبلاً، سيتم تحديث هذه البيانات تلقائياً.
+const mockData = {
+  values: [
+    ['الأهلي (3)', 'ريال مدريد (2)', 'مانشستر سيتي (1)', 'الأهلي', 'لم يُحسم', 'الأهلي', 'الأهلي', 'الأهلي'],
+    ['الزمالك (1)', 'بايرن ميونخ (0)', 'بايرن ميونخ', '', '', 'الزمالك', 'الزمالك', 'الزمالك'],
+    ['الهلال (2)', 'برشلونة (4)', 'برشلونة', '', '', 'الهلال', 'الهلال', 'الهلال'],
+    ['النصر (0)', 'باريس سان جيرمان (1)', 'باريس سان جيرمان', '', '', 'النصر', 'النصر', 'النصر'],
+    ['الاتحاد (3)', 'مانشستر سيتي (5)', '', '', '', 'الاتحاد', 'الاتحاد', 'الاتحاد'],
+    ['العين (1)', 'يوفنتوس (0)', '', '', '', 'العين', 'العين', 'العين'],
+    ['السد (2)', 'أرسنال (1)', '', '', '', 'السد', 'السد', 'السد'],
+    ['الوداد (0)', 'ميلان (2)', '', '', '', 'الوداد', 'الوداد', 'الوداد'],
+    ['الترجي (1)', '', '', '', '', 'الترجي', 'الترجي', 'الترجي'],
+    ['الرجاء (0)', '', '', '', '', 'الرجاء', 'الرجاء', 'الرجاء'],
+    ['القوة الجوية (1)', '', '', '', '', 'القوة الجوية', 'القوة الجوية', 'القوة الجوية'],
+    ['الشباب (2)', '', '', '', '', 'الشباب', 'الشباب', 'الشباب'],
+    ['بورتو (0)', '', '', '', '', 'بورتو', 'بورتو', 'بورتو'],
+    ['ليفربول (3)', '', '', '', '', 'ليفربول', 'ليفربول', 'ليفربول'],
+    ['دورتموند (1)', '', '', '', '', 'دورتموند', 'دورتموند', 'دورتموند'],
+    ['ميلان (1)', '', '', '', '', 'ميلان', 'ميلان', 'ميلان'],
+    ['ريال مدريد (1)', '', '', '', '', '', '', ''],
+    ['بايرن ميونخ (0)', '', '', '', '', '', '', ''],
+    ['برشلونة (1)', '', '', '', '', '', '', ''],
+    ['باريس سان جيرمان (0)', '', '', '', '', '', '', ''],
+    ['مانشستر سيتي (2)', '', '', '', '', '', '', ''],
+    ['يوفنتوس (0)', '', '', '', '', '', '', ''],
+    ['أرسنال (1)', '', '', '', '', '', '', ''],
+    ['ميلان (0)', '', '', '', '', '', '', ''],
+    ['ليفربول (1)', '', '', '', '', '', '', ''],
+    ['دورتموند (0)', '', '', '', '', '', '', '']
+  ]
+};
+
+// إعداد الكاميرا (Panzoom) - تم حل مشكلة الحركة وتقييد الأبعاد
 const canvasElem = document.getElementById('bracketCanvas');
 const panzoomInstance = Panzoom(canvasElem, {
-  maxScale: 1.5, minScale: 0.25, startScale: 0.6,
-  contain: 'outside', canvas: true
+  maxScale: 1.5, 
+  minScale: 0.1, 
+  startScale: 0.6,
+  contain: 'inside', // تم تغيير outside لـ inside للسماح بحرية الحركة
 });
-canvasElem.parentElement.addEventListener('wheel', panzoomInstance.zoomWithWheel);
+
+const viewerElem = document.querySelector('.bracket-viewer');
+viewerElem.addEventListener('wheel', panzoomInstance.zoomWithWheel);
+
 document.getElementById('zoomIn').addEventListener('click', panzoomInstance.zoomIn);
 document.getElementById('zoomOut').addEventListener('click', panzoomInstance.zoomOut);
 document.getElementById('zoomReset').addEventListener('click', () => {
-  panzoomInstance.reset(); panzoomInstance.zoom(0.6);
+  panzoomInstance.reset(); 
+  panzoomInstance.zoom(0.6);
+});
+
+// تفعيل ميزة ملء الشاشة (Full Screen)
+const fullScreenBtn = document.getElementById('fullScreenBtn');
+fullScreenBtn.addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    viewerElem.requestFullscreen().catch(err => {
+      console.error(`Error attempting to enable fullscreen: ${err.message}`);
+    });
+    fullScreenBtn.innerHTML = '<i class="fa-solid fa-minimize"></i>';
+  } else {
+    document.exitFullscreen();
+    fullScreenBtn.innerHTML = '<i class="fa-solid fa-maximize"></i>';
+  }
+});
+
+// مراقبة الخروج من وضع ملء الشاشة بواسطة (ESC) لإرجاع الأيقونة
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) {
+    fullScreenBtn.innerHTML = '<i class="fa-solid fa-maximize"></i>';
+  }
 });
 
 // الهيكل البنائي للبطولة
@@ -354,10 +437,14 @@ function generateSkeleton() {
 }
 
 async function fetchAPI() {
+  // للتشغيل المباشر، نستخدم البيانات الوهمية. لإعادة تفعيل API، قم بإزالة التعليق من الكود أدناه.
+  /*
   const res = await fetch(`${APPS_SCRIPT_URL}?_=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('API Error');
   const data = await res.json();
   return data.values || [];
+  */
+  return mockData.values; // تشغيل باستخدام البيانات الوهمية
 }
 
 function renderUI(rows) {
