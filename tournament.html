@@ -161,11 +161,12 @@ section { padding: 0 20px 60px; max-width: 1600px; margin: 0 auto; }
 
 /* The Pro Connectors (Perfect Curves) */
 /* 1. الخطوط الخارجة من الفرق متجهة لليسار */
+/* تم توسيع الصندوق بمقدار نصف قطر الانحناء (16px) حتى لا يتوقف الخط قبل الوصول لحدود الجولة التالية */
 .round:not(.round-champion) .match::after {
-  content: ''; position: absolute; left: -40px; width: 40px; border-left: 2px solid var(--line-color); z-index: -1;
+  content: ''; position: absolute; left: calc(-40px - 16px); width: calc(40px + 16px); z-index: -1;
 }
-.match:nth-child(odd)::after { top: 50%; height: 50%; border-top: 2px solid var(--line-color); border-top-left-radius: 16px; }
-.match:nth-child(even)::after { bottom: 50%; height: 50%; border-bottom: 2px solid var(--line-color); border-bottom-left-radius: 16px; }
+.match.pair-top::after { top: 50%; height: 50%; border-top: 2px solid var(--line-color); border-left: 2px solid var(--line-color); border-top-left-radius: 16px; }
+.match.pair-bottom::after { bottom: 50%; height: 50%; border-bottom: 2px solid var(--line-color); border-left: 2px solid var(--line-color); border-bottom-left-radius: 16px; }
 
 /* 2. الخطوط الداخلة للفرق في الجولات المتقدمة من اليمين */
 .round:not(.round-32) .match::before {
@@ -254,6 +255,44 @@ section { padding: 0 20px 60px; max-width: 1600px; margin: 0 auto; }
 
 footer { background: #030406; border-top: 1px solid var(--border); padding: 30px 20px; text-align: center; color: var(--text-muted); font-size: 14px; font-weight: 600; margin-top: 60px; }
 footer span { color: var(--primary); }
+
+/* ===== Team Search Box ===== */
+.search-box {
+  display: flex; align-items: center; gap: 0;
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
+  overflow: hidden; backdrop-filter: blur(8px);
+}
+.search-box input {
+  background: transparent; border: none; outline: none; color: var(--text-main);
+  font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 600; padding: 12px 18px;
+  width: 200px; text-align: right; direction: rtl;
+}
+.search-box input::placeholder { color: var(--text-muted); }
+.search-btn {
+  background: var(--primary); color: #000; border: none; padding: 0 20px; height: 100%;
+  align-self: stretch; cursor: pointer; font-size: 15px; transition: background 0.2s;
+}
+.search-btn:hover { background: var(--gold); }
+
+.search-feedback {
+  text-align: center; font-size: 14px; font-weight: 600; color: var(--text-muted);
+  margin: -24px auto 30px; min-height: 20px; transition: color 0.2s;
+}
+.search-feedback.error { color: #ef4444; }
+.search-feedback.success { color: #10b981; }
+
+/* تمييز الفريق الذي تم إيجاده بالبحث */
+.team-box.search-highlight {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4), 0 8px 25px var(--primary-glow) !important;
+  transform: scale(1.08);
+  z-index: 20 !important;
+  animation: searchPulse 1.4s ease-in-out 3;
+}
+@keyframes searchPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4), 0 8px 25px var(--primary-glow); }
+  50% { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0.15), 0 8px 25px var(--primary-glow); }
+}
 </style>
 </head>
 <body>
@@ -275,7 +314,12 @@ footer span { color: var(--primary); }
   <span class="status-pill"><div class="status-dot"></div> Live Engine Active</span>
   <span class="status-pill" id="lastUpdated"><i class="fa-regular fa-clock"></i> جاري الاتصال بالخوادم...</span>
   <button class="refresh-btn" id="refreshBtn"><i class="fa-solid fa-arrows-rotate"></i> مزامنة البيانات</button>
+  <div class="search-box">
+    <input type="text" id="teamSearchInput" placeholder="ابحث عن اسم فريق..." autocomplete="off">
+    <button class="search-btn" id="teamSearchBtn" title="بحث"><i class="fa-solid fa-magnifying-glass"></i></button>
+  </div>
 </div>
+<div id="searchFeedback" class="search-feedback"></div>
 
 <section id="bracket-section">
   <div class="bracket-viewer">
@@ -330,13 +374,15 @@ const fallbackData = {
   ]
 };
 
-// إعداد الكاميرا (Panzoom) - تم حل مشكلة الحركة وتقييد الأبعاد
+// إعداد الكاميرا (Panzoom) - تم إلغاء أي تقييد على الحركة للسماح بالتحرك بحرية كاملة
 const canvasElem = document.getElementById('bracketCanvas');
 const panzoomInstance = Panzoom(canvasElem, {
-  maxScale: 1.5, 
-  minScale: 0.1, 
+  maxScale: 3,
+  minScale: 0.1,
   startScale: 0.6,
-  contain: 'inside', // تم تغيير outside لـ inside للسماح بحرية الحركة
+  canvas: true,      // يسمح بالسحب حتى عند الضغط على العناصر الداخلية
+  contain: false,     // إلغاء القيد الذي كان يمنع الحركة الحرة
+  cursor: 'grab',
 });
 
 const viewerElem = document.querySelector('.bracket-viewer');
@@ -388,7 +434,8 @@ function generateSkeleton() {
     roundEl.className = `round ${round.cls}`;
     roundEl.innerHTML = `<div class="round-label">${round.label}</div>`;
     for(let i=0; i<round.size; i++) {
-      roundEl.innerHTML += `<div class="match"><div class="team-box skeleton"><i class="fa-solid fa-shield"></i> جاري التحميل</div></div>`;
+      const pairClass = (i % 2 === 0) ? 'pair-top' : 'pair-bottom';
+      roundEl.innerHTML += `<div class="match ${pairClass}"><div class="team-box skeleton"><i class="fa-solid fa-shield"></i> جاري التحميل</div></div>`;
     }
     container.appendChild(roundEl);
   });
@@ -442,9 +489,10 @@ function renderUI(rows) {
         const stateClass = text ? 'filled' : 'pending';
         const display = text || 'قريباً';
         const icon = text ? 'fa-shield-halved' : 'fa-lock';
+        const pairClass = (i % 2 === 0) ? 'pair-top' : 'pair-bottom';
         
         roundEl.innerHTML += `
-          <div class="match">
+          <div class="match ${pairClass}">
             <div class="team-box ${stateClass}">
               <i class="fa-solid ${icon}"></i> <span>${display}</span>
             </div>
@@ -503,6 +551,68 @@ async function bootEngine(manual = false) {
 document.getElementById('refreshBtn').addEventListener('click', () => bootEngine(true));
 bootEngine(); // التشغيل الأولي
 setInterval(() => bootEngine(), REFRESH_MS); // التشغيل التلقائي
+
+/* =========================================
+   محرك البحث عن فريق داخل المخطط
+   ========================================= */
+const searchInput = document.getElementById('teamSearchInput');
+const searchBtn = document.getElementById('teamSearchBtn');
+const searchFeedback = document.getElementById('searchFeedback');
+
+// يحسب موقع العنصر الحقيقي (بدون تأثير الـ transform) نسبةً إلى الكانفاس
+function getOffsetWithinCanvas(el) {
+  let x = 0, y = 0, node = el;
+  while (node && node !== canvasElem) {
+    x += node.offsetLeft;
+    y += node.offsetTop;
+    node = node.offsetParent;
+  }
+  return { x, y };
+}
+
+function panToTeam(el) {
+  const scale = panzoomInstance.getScale();
+  const offset = getOffsetWithinCanvas(el);
+  const elCenterX = offset.x + el.offsetWidth / 2;
+  const elCenterY = offset.y + el.offsetHeight / 2;
+
+  const viewerRect = viewerElem.getBoundingClientRect();
+  const targetX = (viewerRect.width / 2) - (elCenterX * scale);
+  const targetY = (viewerRect.height / 2) - (elCenterY * scale);
+
+  panzoomInstance.pan(targetX, targetY, { animate: true });
+}
+
+function runTeamSearch() {
+  const query = searchInput.value.trim();
+  document.querySelectorAll('.team-box.search-highlight').forEach(el => el.classList.remove('search-highlight'));
+
+  if (!query) {
+    searchFeedback.textContent = '';
+    searchFeedback.className = 'search-feedback';
+    return;
+  }
+
+  const normalized = query.toLowerCase();
+  const allBoxes = Array.from(document.querySelectorAll('#bracketContainer .team-box.filled'));
+  const match = allBoxes.find(box => box.textContent.trim().toLowerCase().includes(normalized));
+
+  if (match) {
+    match.classList.add('search-highlight');
+    panToTeam(match);
+    searchFeedback.textContent = `تم العثور على الفريق ✓`;
+    searchFeedback.className = 'search-feedback success';
+    setTimeout(() => match.classList.remove('search-highlight'), 4200);
+  } else {
+    searchFeedback.textContent = 'لم يتم العثور على أي فريق بهذا الاسم';
+    searchFeedback.className = 'search-feedback error';
+  }
+}
+
+searchBtn.addEventListener('click', runTeamSearch);
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') runTeamSearch();
+});
 </script>
 
 </body>
