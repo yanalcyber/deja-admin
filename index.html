@@ -650,6 +650,53 @@
             color: #000;
             border-color: var(--primary);
         }
+        /* Image Marquee Section (معرض الصور المتحرك) */
+        .image-marquee-section {
+            padding: 40px 0;
+            background-color: #050507; /* لون خلفية أغمق قليلاً لتمييز القسم */
+            overflow: hidden;
+            position: relative;
+            width: 100%;
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .marquee-track {
+            display: flex;
+            gap: 20px;
+            width: max-content;
+            /* حركة مستمرة لليسار إلى اليمين لمدة 25 ثانية */
+            animation: scrollLTR 25s linear infinite; 
+        }
+
+        /* توقيف الحركة عند وضع الماوس على الصور (اختياري) */
+        .marquee-track:hover {
+            animation-play-state: paused; 
+        }
+
+        .marquee-track img {
+            width: 300px;
+            height: 220px;
+            object-fit: cover;
+            border-radius: 12px;
+            border: 2px solid var(--border-color);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .marquee-track img:hover {
+            transform: scale(1.05);
+            border-color: var(--primary);
+        }
+
+        /* إعدادات الحركة من اليسار إلى اليمين */
+        @keyframes scrollLTR {
+            0% {
+                transform: translateX(-50%);
+            }
+            100% {
+                transform: translateX(0);
+            }
+        }
 
         /* Responsive Design */
         @media (max-width: 968px) {
@@ -693,6 +740,26 @@
                 <a href="#services" class="btn-secondary">اكتشف خدماتنا</a>
                 <a href="tournament.html" class="btn-tournament"><i class="fa-solid fa-trophy"></i> تابع دوري كرة القدم</a>
             </div>
+        </div>
+    </section>
+    <!-- Image Slider Section -->
+    <section class="image-marquee-section" dir="ltr">
+        <div class="marquee-track">
+            <!-- المجموعة الأولى: صورك الـ 6 -->
+            <img src="1.jpg" alt="صورة 1">
+            <img src="2.jpg" alt="صورة 2">
+            <img src="3.jpg" alt="صورة 3">
+            <img src="4.jpg" alt="صورة 4">
+            <img src="5.jpg" alt="صورة 5">
+            <img src="6.jpg" alt="صورة 6">
+            
+            <!-- المجموعة الثانية: تكرار لنفس الصور الـ 6 لضمان الحركة المستمرة بدون تقطيع -->
+            <img src="1.jpg" alt="صورة 1">
+            <img src="2.jpg" alt="صورة 2">
+            <img src="3.jpg" alt="صورة 3">
+            <img src="4.jpg" alt="صورة 4">
+            <img src="5.jpg" alt="صورة 5">
+            <img src="6.jpg" alt="صورة 6">
         </div>
     </section>
 
@@ -928,4 +995,6 @@
     </footer>
 
 </body>
+</html>
+
 </html>
