@@ -710,6 +710,19 @@
                 display: none; /* Can be expanded into a burger menu in real deployment */
             }
         }
+        /* --- تعديلات الشاشات الكبيرة لتعبئة الفراغ الجانبي --- */
+@media (min-width: 1200px) {
+    .nav-container, 
+    section, 
+    .footer-content {
+        max-width: 90%; /* يمكنك جعلها 95% إذا أردت فراغاً أصغر */
+    }
+    
+    /* تكبير العرض الأقصى للنص في القسم الرئيسي (Hero) ليتناسب مع الشاشة */
+    .hero-content {
+        max-width: 1000px; 
+    }
+}
     </style>
 </head>
 <body>
